@@ -1,2 +1,4 @@
-# finegrained
-A cli tool to quickly prepare training data, train models and export to inference formats
+# Fine-grained image recognition
+
+A package to quickly collect training data, label it, train models and make deployments
+using command line and integrations with other services.
