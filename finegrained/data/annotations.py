@@ -1,10 +1,10 @@
 """Send, query and get annotation results.
 """
-from configparser import ConfigParser
 from pathlib import Path
 from typing import Optional, Any
 
-from .utils import load_fiftyone_dataset
+from .dataset_utils import load_fiftyone_dataset
+from ..utils import types
 from ..utils.os_utils import load_txt, load_file_config
 
 
@@ -39,6 +39,20 @@ def annotate(
     dataset_kwargs: Optional[dict] = None,
     **kwargs,
 ):
+    """Send samples to annotations
+
+    Args:
+        dataset: fiftyone dataset with samples
+        annotation_key: assign this key for annotation run
+        label_field: if exists, upload labels
+        backend: backend name or filepath to configs
+        overwrite: overwrite existing annotation run if True
+        dataset_kwargs: dataset loading filters
+        **kwargs: annotation kwargs
+
+    Returns:
+        none
+    """
     dataset = load_fiftyone_dataset(
         dataset, **dataset_kwargs if bool(dataset_kwargs) else {}
     )
@@ -61,6 +75,18 @@ def load(
     dest_field: str = None,
     dataset_kwargs: Optional[dict] = None,
 ):
+    """Download annotations from an annotation backend.
+
+    Args:
+        dataset: fiftyone dataset name
+        annotation_key: annotation key used to send for annotations
+        backend: annotation backend name or filepath with configs
+        dest_field: if given, annotations will be stored in a new field
+        dataset_kwargs: dataset loading filters
+
+    Returns:
+        none
+    """
     backend_conf = _load_backend_config(backend)
     backend_conf.pop("backend")
     dataset = load_fiftyone_dataset(
@@ -71,6 +97,15 @@ def load(
     )
 
 
-def list_keys(dataset: str):
+def list_keys(dataset: str) -> types.LIST_STR:
+    """List annotation keys attributed to the dataset
+
+    Args:
+        dataset: fiftyone dataset name
+
+    Returns:
+        a list of keys
+    """
     dataset = load_fiftyone_dataset(dataset)
-    print(dataset.list_annotation_runs())
+    keys = dataset.list_annotation_runs()
+    return keys

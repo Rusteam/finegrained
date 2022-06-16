@@ -2,7 +2,8 @@ import fiftyone as fo
 from fiftyone import ViewField as F
 from fiftyone.types import ImageClassificationDirectoryTree
 
-from finegrained.utils.general import parse_list_str, LIST_STR
+from finegrained.utils.general import parse_list_str
+from finegrained.utils.types import LIST_STR
 
 
 def load_fiftyone_dataset(

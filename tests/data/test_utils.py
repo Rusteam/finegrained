@@ -1,7 +1,7 @@
 import pytest
 import fiftyone as fo
 
-from finegrained.data import utils
+from finegrained.data import dataset_utils
 
 
 @pytest.fixture()
