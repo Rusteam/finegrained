@@ -5,7 +5,7 @@ from typing import Optional, Union
 import yaml
 
 
-def load_txt(filepath: str):
+def read_txt(filepath: str):
     return Path(filepath).read_text().strip().split("\n")
 
 
@@ -15,24 +15,24 @@ def parse_keyval_line(line: str) -> tuple:
     return key, val
 
 
-def load_file_config(file: str, section=None):
+def read_file_config(file: str, section=None):
     if file.endswith((".txt", ".text")):
-        config = load_txt_credentials(file)
+        config = read_txt_credentials(file)
     elif file.endswith(".ini"):
-        config = load_ini_credentials(file, section=section)
+        config = read_ini_credentials(file, section=section)
     else:
         raise NotImplementedError(f"{file=} file extension not supported yet.")
     return config
 
 
-def load_txt_credentials(path: str) -> dict:
-    lines = load_txt(path)
+def read_txt_credentials(path: str) -> dict:
+    lines = read_txt(path)
     config = list(map(parse_keyval_line, lines))
     config = dict(config)
     return config
 
 
-def load_ini_credentials(
+def read_ini_credentials(
     path: str, section: Optional[str] = None
 ) -> Union[dict, ConfigParser]:
     parser = ConfigParser()
@@ -45,7 +45,12 @@ def load_ini_credentials(
         return parser
 
 
-def parse_yaml(path: str):
+def read_yaml(path: str):
     with open(path, "r") as f:
         data = yaml.safe_load(f)
     return data
+
+
+def write_yaml(data: dict, path: str):
+    with open(path, 'w') as f:
+        yaml.safe_dump(data, f)

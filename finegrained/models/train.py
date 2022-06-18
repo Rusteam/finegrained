@@ -1,72 +1,74 @@
-from itertools import chain
-from typing import Any
+from typing import Tuple
 
+import torch.cuda
 from flash import Trainer, DataModule
-from flash.image import ObjectDetectionData, ObjectDetector
-from flash.image.detection.output import FiftyOneDetectionLabelsOutput
-
-import fiftyone as fo
-import fiftyone.utils.splits as fous
-import fiftyone.zoo as foz
+from flash.core.data.utilities.classification import SingleLabelTargetFormatter
+from flash.image import ImageClassificationData, ImageClassifier
 
 from finegrained.data.dataset_utils import (
     load_fiftyone_dataset,
-    get_unique_labels,
 )
-from finegrained.utils.os_utils import parse_yaml
+from finegrained.utils import types
+from finegrained.utils.os_utils import read_yaml
 
 
-def _load_datamodule(
-    dataset: str, label_field: str, **kwargs
-) -> tuple[DataModule, int]:
-    if "fields_exist" not in kwargs:
-        kwargs.update({"fields_exist": label_field})
-    dataset = load_fiftyone_dataset(dataset, **kwargs)
-    splits = {"train": 0.8, "test": 0.1, "val": 0.1}
-    fous.random_split(dataset, splits)
-    train_dataset = dataset.match_tags("train")
-    test_dataset = dataset.match_tags("test")
-    val_dataset = dataset.match_tags("val")
-    if len(dataset.default_classes) > 0:
-        dataset.default_classes.pop(0)
-    datamodule = ObjectDetectionData.from_fiftyone(
-        train_dataset=train_dataset,
-        test_dataset=test_dataset,
-        val_dataset=val_dataset,
+def _init_classification_datamodule(dataset: str,
+                                    label_field: str,
+                                    **kwargs) -> Tuple[DataModule, types.LIST_STR]:
+    dataset = load_fiftyone_dataset(dataset)
+    labels = dataset.distinct(f"{label_field}.label")
+    data = ImageClassificationData.from_fiftyone(
+        train_dataset=dataset.match_tags("train"),
+        val_dataset=dataset.match_tags('val'),
+        test_dataset=dataset.match_tags('test'),
         label_field=label_field,
-        transform_kwargs={"image_size": 512},
-        batch_size=4,
+        batch_size=kwargs.get("batch_size", 16),
+        target_formatter=SingleLabelTargetFormatter(labels=labels,
+                                                    num_classes=len(labels)),
     )
-    return datamodule, len(get_unique_labels(dataset, label_field))
+    return data, labels
 
 
-def _build_model(head: str, backbone: str, num_classes: int):
-    model = ObjectDetector(
+def _init_classifier(backbone: str, classes: types.LIST_STR, **kwargs) -> ImageClassifier:
+    clf = ImageClassifier(
+        num_classes=len(classes),
         backbone=backbone,
-        head=head,
-        num_classes=num_classes,
-        image_size=512,
+        labels=classes,
+        **kwargs,
     )
-    return model
+    return clf
 
 
-def _finetune(model, datamodule, **kwargs):
+def _finetune(model, data: DataModule, epochs, **kwargs):
     trainer = Trainer(
-        max_epochs=kwargs.get("max_epochs", 10), limit_train_batches=10
+        max_epochs=epochs,
+        limit_train_batches=kwargs.get("limit_train_batches"),
+        limit_val_batches=kwargs.get("limit_val_batches"),
+        gpus=torch.cuda.device_count(),
     )
 
-    trainer.finetune(model, datamodule=datamodule, strategy="freeze")
+    trainer.finetune(model,
+                     datamodule=data,
+                     strategy=kwargs.get("strategy", ("freeze_unfreeze", 1)),
+    )
 
     trainer.save_checkpoint(kwargs.get("save_checkpoint", "model.pt"))
 
 
-def object_detection(config: Any):
-    conf = parse_yaml(config)
-    data_conf = conf.get("data", AssertionError)
-    datamodule, n_classes = _load_datamodule(
-        data_conf["dataset"], data_conf["label_field"], **data_conf["kwargs"]
-    )
-    model = _build_model(
-        num_classes=n_classes, **conf.get("model", AssertionError)
-    )
-    _finetune(model, datamodule, **conf.get("train"))
+def _validate_config(cfg: dict):
+    for key in ["data", "model", "trainer"]:
+        assert key in cfg, f"config file has to contain {key=}"
+    for key in ["dataset", "label_field"]:
+        assert key in cfg["data"], f"data has to contain {key=}"
+    for key in ["backbone"]:
+        assert key in cfg["model"], f"model has to contain {key=}"
+    for key in ["epochs"]:
+        assert key in cfg["trainer"], f"trainer has to contain {key=}"
+
+
+def finetune_classifier(cfg: str):
+    cfg = read_yaml(cfg)
+    _validate_config(cfg)
+    data, class_labels = _init_classification_datamodule(**cfg["data"])
+    model = _init_classifier(classes=class_labels, **cfg["model"])
+    _finetune(model, data, **cfg["trainer"])

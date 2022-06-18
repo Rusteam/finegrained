@@ -2,6 +2,7 @@ import shutil
 
 import pytest
 import fiftyone as fo
+import fiftyone.zoo as foz
 
 from finegrained.data import transforms
 from finegrained.data.dataset_utils import get_unique_labels
@@ -22,6 +23,13 @@ def coco_clone_temp(coco_dataset):
     new = coco_dataset.clone(name)
     yield new, name
     fo.delete_dataset(name)
+
+
+@pytest.fixture()
+def clf_dataset_temp():
+    dataset = foz.load_zoo_dataset("caltech101").take(15).clone("test_temp_dataset")
+    yield dataset.name
+    fo.delete_dataset(dataset.name)
 
 
 @pytest.fixture()
@@ -91,4 +99,9 @@ def test_split_dataset(coco_clone_temp, splits):
         assert v / total * data_len == tag_counts[k]
 
 
+def test_prefix_label(clf_dataset_temp):
+    dataset = transforms.prefix_label(clf_dataset_temp, label_field="ground_truth",
+                            dest_field="with_prefix", prefix="new")
 
+    for smp in dataset.select_fields("with_prefix"):
+        assert smp["with_prefix"].label.startswith("new")

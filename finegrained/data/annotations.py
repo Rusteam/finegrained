@@ -5,7 +5,7 @@ from typing import Optional, Any
 
 from .dataset_utils import load_fiftyone_dataset
 from ..utils import types
-from ..utils.os_utils import load_txt, load_file_config
+from ..utils.os_utils import read_txt, read_file_config
 
 
 def _load_backend_config(src: Any) -> dict:
@@ -13,7 +13,7 @@ def _load_backend_config(src: Any) -> dict:
         config = src
     elif isinstance(src, str) and Path(src).is_file():
         # if a txt file as file
-        config = load_file_config(src, section="annotation_backend")
+        config = read_file_config(src, section="annotation_backend")
     else:
         raise ValueError(f"{type(src)!r} type has not been implemented.")
     return config
@@ -23,7 +23,7 @@ def _parse_classes(src: Any) -> list[str]:
     if isinstance(src, list):
         return src
     elif isinstance(src, str) and Path(src).is_file():
-        return load_txt(src)
+        return read_txt(src)
     else:
         raise ValueError(
             f"Classes has to be a list of str or a path to a txt file. Received {type(src)}"

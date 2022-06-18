@@ -1,6 +1,8 @@
 """Data transforms on top of fiftyone datasets.
 """
 import fiftyone as fo
+from fiftyone import ViewField as F
+from fiftyone.core.fields import StringField
 from fiftyone.types import ImageClassificationDirectoryTree
 import fiftyone.utils.splits as fous
 
@@ -10,21 +12,21 @@ from ..utils import types
 
 
 def _export_patches(
-    dataset: fo.Dataset,
-    label_field: str,
-    export_dir: str,
+        dataset: fo.Dataset,
+        label_field: str,
+        export_dir: str,
 ) -> None:
     patches = dataset.to_patches(label_field)
     patches.export(export_dir, dataset_type=ImageClassificationDirectoryTree)
 
 
 def to_patches(
-    dataset: str,
-    label_field: str,
-    to_name: str,
-    export_dir: str,
-    overwrite: bool = False,
-    **kwargs,
+        dataset: str,
+        label_field: str,
+        to_name: str,
+        export_dir: str,
+        overwrite: bool = False,
+        **kwargs,
 ):
     """Crop out patches from a dataset and create a new one
 
@@ -80,8 +82,8 @@ def delete_field(dataset: str, fields: types.LIST_STR_STR):
 
 
 def split_dataset(
-    dataset: str,
-    splits: types.DICT_STR_FLOAT = {"train": 0.8, "val": 0.1, "test": 0.1},
+        dataset: str,
+        splits: types.DICT_STR_FLOAT = {"train": 0.8, "val": 0.1, "test": 0.1},
 ):
     """Create data split tags for a dataset
 
@@ -95,3 +97,13 @@ def split_dataset(
     dataset = load_fiftyone_dataset(dataset)
     fous.random_split(dataset, splits)
     return dataset.count_sample_tags()
+
+
+def prefix_label(dataset: str, label_field: str, dest_field: str, prefix: str):
+    dataset = load_fiftyone_dataset(dataset)
+    values = [
+        fo.Classification(label=f"{prefix}_{smp[label_field].label}")
+        for smp in dataset.select_fields(label_field)
+    ]
+    dataset.set_values(dest_field, values)
+    return dataset
