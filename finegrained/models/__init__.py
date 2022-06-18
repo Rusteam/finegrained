@@ -1,3 +1,3 @@
-from . import train, embed
+from . import train, embed, predict
 
-__all__ = [train, embed]
+__all__ = [train, embed, predict]

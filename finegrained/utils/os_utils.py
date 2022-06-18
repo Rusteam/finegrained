@@ -52,5 +52,5 @@ def read_yaml(path: str):
 
 
 def write_yaml(data: dict, path: str):
-    with open(path, 'w') as f:
+    with open(path, "w") as f:
         yaml.safe_dump(data, f)

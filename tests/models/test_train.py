@@ -6,8 +6,11 @@ import pytest
 import fiftyone as fo
 import fiftyone.zoo as foz
 import fiftyone.utils.splits as fous
+import torch.cuda
+from flash import Trainer
+from flash.image import ImageClassifier
 
-from finegrained.models import train
+from finegrained.models import train, predict
 from finegrained.utils.os_utils import write_yaml
 
 
@@ -47,8 +50,32 @@ def clf_config(clf_dataset, tmp_path):
     model_path.unlink(True)
 
 
+@pytest.fixture()
+def clf_ckpt(tmp_path):
+    labels = fo.load_dataset("caltech101").distinct("ground_truth.label")
+    clf = ImageClassifier(backbone="efficientnet_b0", labels=labels)
+    trainer = Trainer(gpus=torch.cuda.device_count(), max_epochs=0)
+    trainer.model = clf
+    path = Path(tmp_path) / "clf_ckpt.pt"
+    trainer.save_checkpoint(path)
+    yield path
+    path.unlink()
+
+
 def test_classification(clf_config):
     cfg, model_path = clf_config
     train.finetune_classifier(str(cfg))
 
     assert model_path.exists()
+
+
+def test_predict(clf_dataset, clf_ckpt):
+    predict.predict_classes(clf_dataset,
+                            label_field="test_temp_predictions",
+                            ckpt_path=clf_ckpt,
+                            include_tags=["test", "val"])
+
+    dataset = fo.load_dataset(clf_dataset)
+    _ = dataset.evaluate_classifications("test_temp_predictions",
+                                     gt_field="ground_truth",
+                                     eval_key="test_eval_temp")

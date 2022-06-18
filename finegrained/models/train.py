@@ -12,24 +12,27 @@ from finegrained.utils import types
 from finegrained.utils.os_utils import read_yaml
 
 
-def _init_classification_datamodule(dataset: str,
-                                    label_field: str,
-                                    **kwargs) -> Tuple[DataModule, types.LIST_STR]:
+def _init_classification_datamodule(
+    dataset: str, label_field: str, **kwargs
+) -> Tuple[DataModule, types.LIST_STR]:
     dataset = load_fiftyone_dataset(dataset)
     labels = dataset.distinct(f"{label_field}.label")
     data = ImageClassificationData.from_fiftyone(
         train_dataset=dataset.match_tags("train"),
-        val_dataset=dataset.match_tags('val'),
-        test_dataset=dataset.match_tags('test'),
+        val_dataset=dataset.match_tags("val"),
+        test_dataset=dataset.match_tags("test"),
         label_field=label_field,
         batch_size=kwargs.get("batch_size", 16),
-        target_formatter=SingleLabelTargetFormatter(labels=labels,
-                                                    num_classes=len(labels)),
+        target_formatter=SingleLabelTargetFormatter(
+            labels=labels, num_classes=len(labels)
+        ),
     )
     return data, labels
 
 
-def _init_classifier(backbone: str, classes: types.LIST_STR, **kwargs) -> ImageClassifier:
+def _init_classifier(
+    backbone: str, classes: types.LIST_STR, **kwargs
+) -> ImageClassifier:
     clf = ImageClassifier(
         num_classes=len(classes),
         backbone=backbone,
@@ -47,9 +50,10 @@ def _finetune(model, data: DataModule, epochs, **kwargs):
         gpus=torch.cuda.device_count(),
     )
 
-    trainer.finetune(model,
-                     datamodule=data,
-                     strategy=kwargs.get("strategy", ("freeze_unfreeze", 1)),
+    trainer.finetune(
+        model,
+        datamodule=data,
+        strategy=kwargs.get("strategy", ("freeze_unfreeze", 1)),
     )
 
     trainer.save_checkpoint(kwargs.get("save_checkpoint", "model.pt"))
