@@ -16,6 +16,21 @@ def load_fiftyone_dataset(
     fields_exist: LIST_STR = None,
     not_exist: LIST_STR = None,
 ) -> fo.Dataset:
+    """Load a dataset and apply view filters
+
+    Args:
+        dataset: fiftyone dataset name
+        include_labels: keep samples that have fields with these values
+        include_tags: keep samples that match these sample tags
+        exclude_tags: exclude samples that match these sample tags
+        max_samples: randomly select this number of samples if specified
+        label_conf: if 'include_labels' specified, apply confidence threshold
+        fields_exist: keep samples that contain these fields
+        not_exist: keep samples that do Not contain these fields
+
+    Returns:
+        a fiftyone dataset
+    """
     if include_tags is None:
         include_tags = []
     dataset = fo.load_dataset(dataset)
@@ -46,7 +61,19 @@ def create_fiftyone_dataset(
     dataset_type=ImageClassificationDirectoryTree,
     overwrite: bool = False,
     persistent: bool = True,
-):
+) -> fo.Dataset:
+    """Create a fiftyone dataset
+
+    Args:
+        name: a name for this dataset
+        src: dataset directory
+        dataset_type: fiftyone dataset format
+        overwrite: whether to overwrite if that name is already taken
+        persistent: whether to persist this dataset in mongo
+
+    Returns:
+        a fiftyone dataset
+    """
     if (exists := fo.dataset_exists(name)) and not overwrite:
         raise ValueError(
             f"Dataset {name!r} already exists!. User overwrite=True to delete it"
@@ -64,15 +91,28 @@ def create_fiftyone_dataset(
 
 
 def get_unique_labels(dataset: fo.Dataset, label_field: str) -> list[str]:
-    for smp in dataset.select_fields(label_field):
-        break
-    if isinstance(smp[label_field], fo.Detections):
-        field = f"{label_field}.detections.label"
-    elif isinstance(smp[label_field], fo.Classification):
-        field = f"{label_field}.label"
-    else:
-        raise NotImplementedError(
-            f"Not implemented for type {type(smp[label_field])}."
-        )
-    labels = dataset.distinct(F(field))
+    """Extract a list of labels from a field
+
+    Args:
+        dataset: a fiftyone dataset object
+        label_field: a field to extract labels from
+
+    Returns:
+        a list of class labels
+    """
+    label_fields = parse_list_str(label_field)
+    labels = []
+    for field in label_fields:
+        if not dataset.has_sample_field(field):
+            raise KeyError(f"{dataset.name} does not contain {field=}")
+        label_type = dataset.get_field(field).document_type
+        if label_type == fo.Classification:
+            view_field = f"{field}.label"
+        elif label_type == fo.Detections:
+            view_field = f"{field}.detections.label"
+        elif label_type == fo.Polylines:
+            view_field = f"{field}.polylines.label"
+        else:
+            raise NotImplementedError(f"Not implemented for {label_type=}.")
+        labels.extend(dataset.distinct(F(view_field)))
     return labels

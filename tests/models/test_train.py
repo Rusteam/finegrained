@@ -10,6 +10,7 @@ import torch.cuda
 from flash import Trainer
 from flash.image import ImageClassifier
 
+import finegrained.models.image_classification
 from finegrained.models import train, predict
 from finegrained.utils.os_utils import write_yaml
 
@@ -64,7 +65,7 @@ def clf_ckpt(tmp_path):
 
 def test_classification(clf_config):
     cfg, model_path = clf_config
-    train.finetune_classifier(str(cfg))
+    finegrained.models.image_classification.finetune_classifier(str(cfg))
 
     assert model_path.exists()
 

@@ -1,3 +1,3 @@
-from . import annotations, transforms
+from . import annotations, transforms, brain
 
-__all__ = [annotations, transforms]
+__all__ = [annotations, transforms, brain]

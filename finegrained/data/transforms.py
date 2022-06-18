@@ -2,13 +2,12 @@
 """
 import fiftyone as fo
 from fiftyone import ViewField as F
-from fiftyone.core.fields import StringField
-from fiftyone.types import ImageClassificationDirectoryTree
 import fiftyone.utils.splits as fous
+from fiftyone.types import ImageClassificationDirectoryTree
 
 from .dataset_utils import load_fiftyone_dataset, create_fiftyone_dataset
-from ..utils.general import parse_list_str
 from ..utils import types
+from ..utils.general import parse_list_str
 
 
 def _export_patches(
@@ -16,8 +15,21 @@ def _export_patches(
     label_field: str,
     export_dir: str,
 ) -> None:
-    patches = dataset.to_patches(label_field)
-    patches.export(export_dir, dataset_type=ImageClassificationDirectoryTree)
+    label_type = dataset.get_field(label_field)
+    if label_type is None:
+        raise KeyError(f"{label_field=} does not exist in {dataset.name=}")
+    label_type = label_type.document_type
+    if label_type == fo.Classification:
+        patches = dataset.exists(label_field)
+    elif label_type in [fo.Detections, fo.Polylines]:
+        patches = dataset.to_patches(label_field)
+    else:
+        raise ValueError(f"{label_type=} cannot be exported as patches")
+    patches.export(
+        export_dir,
+        dataset_type=ImageClassificationDirectoryTree,
+        label_field=label_field,
+    )
 
 
 def to_patches(
@@ -27,7 +39,7 @@ def to_patches(
     export_dir: str,
     overwrite: bool = False,
     **kwargs,
-):
+) -> fo.Dataset:
     """Crop out patches from a dataset and create a new one
 
     Args:
@@ -39,16 +51,19 @@ def to_patches(
         **kwargs: dataset filters
 
     Returns:
-        none
+        fiftyone dataset object
     """
     dataset = load_fiftyone_dataset(dataset, **kwargs)
-    _export_patches(dataset, label_field, export_dir)
-    create_fiftyone_dataset(
+    label_field = parse_list_str(label_field)
+    for field in label_field:
+        _export_patches(dataset, field, export_dir)
+    new = create_fiftyone_dataset(
         to_name, export_dir, ImageClassificationDirectoryTree, overwrite
     )
+    return new
 
 
-def tag_samples(dataset: str, tags: types.LIST_STR_STR, **kwargs):
+def tag_samples(dataset: str, tags: types.LIST_STR_STR, **kwargs) -> dict:
     """Tag each sample in dataset with given tags
 
     Args:
@@ -57,10 +72,11 @@ def tag_samples(dataset: str, tags: types.LIST_STR_STR, **kwargs):
         kwargs: dataset loading kwargs, i.e. filters
 
     Returns:
-        none
+        a dict of sample tag counts
     """
     dataset = load_fiftyone_dataset(dataset, **kwargs)
     dataset.tag_samples(parse_list_str(tags))
+    return dataset.count_sample_tags()
 
 
 def delete_field(dataset: str, fields: types.LIST_STR_STR):
@@ -100,6 +116,17 @@ def split_dataset(
 
 
 def prefix_label(dataset: str, label_field: str, dest_field: str, prefix: str):
+    """Prepend each label with given prefix
+
+    Args:
+        dataset: fiftyone dataset name
+        label_field: a field with class labels
+        dest_field: a new field to create with '<prefix>_<label>' values
+        prefix: a prefix value
+
+    Returns:
+        fiftyone dataset object
+    """
     dataset = load_fiftyone_dataset(dataset)
     values = [
         fo.Classification(label=f"{prefix}_{smp[label_field].label}")
@@ -107,3 +134,21 @@ def prefix_label(dataset: str, label_field: str, dest_field: str, prefix: str):
     ]
     dataset.set_values(dest_field, values)
     return dataset
+
+
+def tag_vertical(dataset: str, tag: str = "vertical", **kwargs) -> dict:
+    """Add a tag to samples where height is larger than width
+
+    Args:
+        dataset: fiftyone dataset name
+        tag: a tag to add
+        **kwargs: dataset filter kwargs
+
+    Returns:
+        a dict with sample tag counts
+    """
+    dataset = load_fiftyone_dataset(dataset, **kwargs)
+    dataset.compute_metadata()
+    vertical_view = dataset.match(F("metadata.height") > F("metadata.width"))
+    vertical_view.tag_samples(tag)
+    return vertical_view.count_sample_tags()

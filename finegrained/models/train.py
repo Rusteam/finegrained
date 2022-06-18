@@ -53,7 +53,7 @@ def _finetune(model, data: DataModule, epochs, **kwargs):
     trainer.finetune(
         model,
         datamodule=data,
-        strategy=kwargs.get("strategy", ("freeze_unfreeze", 1)),
+        strategy=kwargs.get("strategy", ("freeze_unfreeze", 5)),
     )
 
     trainer.save_checkpoint(kwargs.get("save_checkpoint", "model.pt"))
