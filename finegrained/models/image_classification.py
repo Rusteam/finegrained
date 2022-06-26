@@ -6,7 +6,8 @@ from typing import Tuple
 from fiftyone import Dataset
 from flash import DataModule, Trainer
 from flash.core.classification import FiftyOneLabelsOutput
-from flash.core.data.utilities.classification import SingleLabelTargetFormatter
+from flash.core.data.utilities.classification import \
+    SingleLabelTargetFormatter, SingleNumericTargetFormatter
 from flash.image import (
     ImageClassificationData,
     ImageClassifier,
@@ -15,6 +16,7 @@ from flash.image import (
 from finegrained.data.dataset_utils import load_fiftyone_dataset
 from finegrained.models.flash import get_transform
 from finegrained.models.torch_utils import get_cuda_count
+from finegrained.models.utils import validate_train_config
 from finegrained.utils import types
 from finegrained.utils.os_utils import read_yaml
 
@@ -23,7 +25,7 @@ def _init_training_datamodule(
     dataset: str, label_field: str, **kwargs
 ) -> Tuple[DataModule, types.LIST_STR]:
     dataset = load_fiftyone_dataset(dataset)
-    labels = dataset.distinct(f"{label_field}.label")
+    labels = dataset.match_tags(["train", "val"]).distinct(f"{label_field}.label")
     data = ImageClassificationData.from_fiftyone(
         train_dataset=dataset.match_tags("train"),
         val_dataset=dataset.match_tags("val"),
@@ -85,17 +87,6 @@ def _finetune(model, data: DataModule, epochs, **kwargs):
     trainer.save_checkpoint(kwargs.get("save_checkpoint", "model.pt"))
 
 
-def _validate_config(cfg: dict):
-    for key in ["data", "model", "trainer"]:
-        assert key in cfg, f"config file has to contain {key=}"
-    for key in ["dataset", "label_field"]:
-        assert key in cfg["data"], f"data has to contain {key=}"
-    for key in ["backbone"]:
-        assert key in cfg["model"], f"model has to contain {key=}"
-    for key in ["epochs"]:
-        assert key in cfg["trainer"], f"trainer has to contain {key=}"
-
-
 def _predict(model: ImageClassifier, data: DataModule):
     trainer = Trainer(gpus=get_cuda_count())
     predictions = trainer.predict(
@@ -143,7 +134,7 @@ def finetune(cfg: str):
         cfg: path to yaml file with data, model and trainer configs
     """
     cfg = read_yaml(cfg)
-    _validate_config(cfg)
+    validate_train_config(cfg)
     data, class_labels = _init_training_datamodule(**cfg["data"])
     model = _init_classifier(classes=class_labels, **cfg["model"])
     _finetune(model, data, **cfg["trainer"])

@@ -5,14 +5,17 @@ import pytest
 import fiftyone as fo
 import fiftyone.zoo as foz
 
-from finegrained.data import transforms
+from finegrained.data import transforms, tag
 from finegrained.data.dataset_utils import get_unique_labels
 
 
 @pytest.fixture(scope="module")
 def temp_dataset():
-    dataset = foz.load_zoo_dataset("quickstart").take(15) \
-        .clone('test_transforms_temp')
+    dataset = (
+        foz.load_zoo_dataset("quickstart")
+        .take(100)
+        .clone("test_transforms_temp")
+    )
     if not dataset.has_sample_field("resnet50"):
         model = foz.load_zoo_model("resnet50")
         dataset.apply(model, label_field="resnet50", batch_size=4)
@@ -29,8 +32,9 @@ def to_patches_conf(tmp_path):
     fo.delete_dataset(name)
 
 
-@pytest.mark.parametrize("label_field", ["predictions",
-                                         ("predictions", "resnet50")])
+@pytest.mark.parametrize(
+    "label_field", ["predictions", ("predictions", "resnet50")]
+)
 def test_to_patches(to_patches_conf, temp_dataset, label_field):
     export_dir, name = to_patches_conf
     params = dict(
@@ -43,14 +47,13 @@ def test_to_patches(to_patches_conf, temp_dataset, label_field):
     new = transforms.to_patches(**params)
 
     new_labels = get_unique_labels(new, "ground_truth")
-    existing_labels = get_unique_labels(temp_dataset,
-                                        label_field)
+    existing_labels = get_unique_labels(temp_dataset, label_field)
 
     assert len(set(new_labels).difference(existing_labels)) == 0
 
 
 def test_tag_samples(temp_dataset):
-    transforms.tag_samples(temp_dataset.name, "new_tag")
+    tag.tag_samples(temp_dataset.name, "new_tag")
 
     for tag in ["new_tag", "two", "four"]:
         tagged = temp_dataset.match_tags(tag)
@@ -68,10 +71,11 @@ def test_delete_field(temp_dataset):
         assert not temp_dataset.has_sample_field(field)
 
 
-@pytest.mark.parametrize("splits", [{"rain": 0.65, "text": 0.35},
-                                    {"a": 0.5, "b": 0.5, "c": 0.5}])
+@pytest.mark.parametrize(
+    "splits", [{"rain": 0.65, "text": 0.35}, {"a": 0.5, "b": 0.5, "c": 0.5}]
+)
 def test_split_dataset(temp_dataset, splits):
-    tag_counts = transforms.split_dataset(temp_dataset.name, splits)
+    tag_counts = tag.split_dataset(temp_dataset.name, splits)
 
     data_len = len(temp_dataset)
     total = sum(list(splits.values()))
@@ -80,18 +84,46 @@ def test_split_dataset(temp_dataset, splits):
 
 
 def test_prefix_label(temp_dataset):
-    dataset = transforms.prefix_label(temp_dataset.name,
-                                      label_field="resnet50",
-                                      dest_field="with_prefix",
-                                      prefix="new")
+    dataset = transforms.prefix_label(
+        temp_dataset.name,
+        label_field="resnet50",
+        dest_field="with_prefix",
+        prefix="new",
+    )
 
     for smp in dataset.select_fields("with_prefix"):
         assert smp["with_prefix"].label.startswith("new")
 
 
 def test_is_vertical(temp_dataset):
-    tag_counts = transforms.tag_vertical(temp_dataset.name,
-                                         tag="vert")
+    tag_counts = tag.tag_vertical(temp_dataset.name, tag="vert")
 
     assert "vert" in tag_counts
     assert tag_counts["vert"] > 0
+
+
+def test_split_classes(temp_dataset):
+    tag.split_classes(
+        temp_dataset.name,
+        "resnet50",
+        train_size=0.6,
+        val_size=0.4,
+        min_samples=2,
+    )
+
+    train_labels = get_unique_labels(
+        temp_dataset.match_tags("train"), "resnet50"
+    )
+    val_labels = get_unique_labels(temp_dataset.match_tags("val"), "resnet50")
+    num_intersect = len(set(train_labels).intersection(val_labels))
+    assert num_intersect == 0
+
+    label_counts = temp_dataset.match_tags("train").count_values(
+        "resnet50.label"
+    )
+    assert min(label_counts.values()) >= 2
+
+    label_counts = temp_dataset.match_tags("val").count_values(
+        "resnet50.label"
+    )
+    assert min(label_counts.values()) >= 2

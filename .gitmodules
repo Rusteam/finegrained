@@ -1,0 +1,3 @@
+[submodule "finegrained/models/dino"]
+	path = finegrained/models/dino
+	url = https://github.com/facebookresearch/dino.git
