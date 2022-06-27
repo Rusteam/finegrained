@@ -24,5 +24,15 @@ def compute_mistakenness(
 
 
 def compute_hardness(dataset: str, predictions: str, **kwargs):
+    """Estimate how difficult is this sample to predict.
+
+    Args:
+        dataset: fiftyone dataset name
+        predictions: field with predictions
+        **kwargs: dataset filters
+
+    Returns:
+        None
+    """
     dataset = load_fiftyone_dataset(dataset, **kwargs)
     fob.compute_hardness(dataset, predictions)

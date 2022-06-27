@@ -1,23 +1,19 @@
 """Test training models.
 """
-import random
 from pathlib import Path
 
-import pytest
 import fiftyone as fo
-import fiftyone.zoo as foz
 import fiftyone.utils.splits as fous
-import torch.cuda
-from flash import Trainer
-from flash.image import ImageClassifier
+import fiftyone.zoo as foz
+import pytest
 
 from finegrained.data.brain import compute_hardness
 from finegrained.data.dataset_utils import get_unique_labels
 from finegrained.data.tag import split_classes, split_dataset
 from finegrained.models import (
-    image_classification,
-    image_embedder,
-    image_metalearn,
+    ImageClassification,
+    ImageSelfSupervised,
+    ImageMetalearn,
 )
 from finegrained.utils.os_utils import write_yaml, read_yaml
 
@@ -62,42 +58,28 @@ def clf_config(clf_dataset, tmp_path):
     clf_dataset.tags = []
     fous.random_split(clf_dataset, {"train": 0.7, "val": 0.1, "test": 0.2})
 
-    yield cfg_path, model_path
+    yield cfg_path, model_path, clf_dataset
     cfg_path.unlink(False)
     model_path.unlink(True)
 
 
-@pytest.fixture()
-def clf_ckpt(tmp_path):
-    labels = fo.load_dataset("caltech101").distinct("ground_truth.label")
-    clf = ImageClassifier(backbone="efficientnet_b0", labels=labels)
-    trainer = Trainer(gpus=torch.cuda.device_count(), max_epochs=0)
-    trainer.model = clf
-    path = Path(tmp_path) / "clf_ckpt.pt"
-    trainer.save_checkpoint(path)
-    yield path
-    path.unlink()
-
-
 def test_classification_finetune(clf_config):
-    cfg, model_path = clf_config
-    image_classification.finetune(str(cfg))
+    cfg, model_path, dataset = clf_config
+    img_clf = ImageClassification()
+    img_clf.finetune(cfg)
     assert model_path.exists()
 
-
-def test_classification_predict(clf_dataset, clf_ckpt):
-    image_classification.predict(
-        clf_dataset,
+    img_clf.predict(
+        dataset.name,
         label_field="test_temp_predictions",
-        ckpt_path=clf_ckpt,
+        ckpt_path=str(model_path),
         include_tags=["test", "val"],
         image_size=(224, 112),
     )
 
-    dataset = fo.load_dataset(clf_dataset)
     _ = dataset.evaluate_classifications(
         "test_temp_predictions",
-        gt_field="ground_truth",
+        gt_field="resnet50",
         eval_key="test_eval_temp",
     )
 
@@ -122,6 +104,9 @@ def meta_learn_cfg(clf_dataset, tmp_path):
             dataset=clf_dataset.name,
             label_field=label_field,
             batch_size=2,
+            transform_kwargs={
+                "image_size": (224, 224)
+            }
         ),
         model=dict(
             backbone="efficientnet_b0",
@@ -163,12 +148,13 @@ def meta_learn_cfg(clf_dataset, tmp_path):
 
 def test_metalearning_finetune(meta_learn_cfg):
     cfg, model_path, label_field = meta_learn_cfg
-    image_metalearn.finetune(cfg)
+    img_meta = ImageMetalearn()
+    img_meta.finetune(cfg)
     assert model_path.exists()
 
     conf = read_yaml(cfg)
     split_dataset(conf["data"]["dataset"], splits=dict(support=0.6, query=0.4))
-    image_metalearn.predict(
+    img_meta.predict(
         support_dataset=conf["data"]["dataset"],
         support_label_field="resnet50",
         ckpt_path=str(model_path),
@@ -185,7 +171,7 @@ def test_metalearning_finetune(meta_learn_cfg):
 
 
 @pytest.fixture
-def embed_config(clf_dataset, tmp_path):
+def selfsupervised_config(clf_dataset, tmp_path):
     cfg_path = Path(tmp_path) / "embed_config.yaml"
     model_path = Path(tmp_path) / "embed_model.pt"
     cfg = dict(
@@ -214,7 +200,8 @@ def embed_config(clf_dataset, tmp_path):
     model_path.unlink(True)
 
 
-def test_embedder_finetune(embed_config):
-    cfg_path, model_path = embed_config
-    image_embedder.finetune(cfg_path)
+def test_selfsupervised_finetune(selfsupervised_config):
+    cfg_path, model_path = selfsupervised_config
+    img_emb = ImageSelfSupervised()
+    img_emb.finetune(cfg_path)
     assert model_path.exists()

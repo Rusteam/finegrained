@@ -2,6 +2,7 @@ import fiftyone as fo
 from fiftyone import ViewField as F
 from fiftyone.types import ImageClassificationDirectoryTree
 
+from finegrained.utils import types
 from finegrained.utils.general import parse_list_str
 from finegrained.utils.types import LIST_STR
 
@@ -116,3 +117,19 @@ def get_unique_labels(dataset: fo.Dataset, label_field: str) -> list[str]:
             raise NotImplementedError(f"Not implemented for {label_type=}.")
         labels.extend(dataset.distinct(F(view_field)))
     return labels
+
+
+def get_all_filepaths(dataset: fo.Dataset) -> types.LIST_STR:
+    """Retrieve all filepaths from a sample collection
+
+    Args:
+        dataset: fiftyone dataset object or sample collection
+
+    Returns:
+        a list of absolute paths
+    """
+    files = [
+        smp.filepath
+        for smp in dataset.select_fields("filepath")
+    ]
+    return files

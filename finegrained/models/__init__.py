@@ -1,3 +1,6 @@
-from . import embed, image_classification, image_embedder, image_metalearn
+from . import embed, image_selfsupervised, image_metalearn
+from .image_classification import ImageClassification
+from .image_selfsupervised import ImageSelfSupervised
+from .image_metalearn import ImageMetalearn
 
-__all__ = [image_classification, embed, image_embedder, image_metalearn]
+__all__ = [ImageClassification, embed, ImageSelfSupervised, ImageMetalearn]
