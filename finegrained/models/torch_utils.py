@@ -8,9 +8,20 @@ import torchvision.transforms as T
 from finegrained.utils import types
 
 
+cuda_available = torch.cuda.is_available()
+
+
 def get_cuda_count() -> int:
     """Get a count of gpus if cuda is available."""
-    return torch.cuda.device_count() if torch.cuda.is_available() else 0
+    return torch.cuda.device_count() if cuda_available else 0
+
+
+def get_device() -> torch.device:
+    return torch.device("cuda" if cuda_available else "cpu")
+
+
+def get_default_batch_size() -> int:
+    return 16 if cuda_available else 4
 
 
 def _parse_transform(

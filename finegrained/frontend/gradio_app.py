@@ -4,9 +4,8 @@
 import gradio as gr
 import numpy as np
 
-from finegrained.models import embed
 from finegrained.utils.data import load_data
-from finegrained.utils.huggingface_transformers import SentenceEmbeddings
+from finegrained.models.huggingface_transformers import SentenceEmbeddings
 from finegrained.utils.similarity import SimilaritySearch
 
 MODELS = {
