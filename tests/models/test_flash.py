@@ -5,7 +5,12 @@ from pathlib import Path
 import fiftyone as fo
 import fiftyone.utils.splits as fous
 import fiftyone.zoo as foz
+import numpy as np
+import onnx
 import pytest
+import torch
+from onnxruntime import InferenceSession
+from transformers.utils import to_numpy
 
 from finegrained.data.brain import compute_hardness
 from finegrained.data.dataset_utils import get_unique_labels
@@ -16,6 +21,7 @@ from finegrained.models import (
     ImageMetalearn,
 )
 from finegrained.utils.os_utils import write_yaml, read_yaml
+from tests.models.triton import check_triton_onnx, check_triton_labels
 
 
 @pytest.fixture(scope="module")
@@ -63,7 +69,7 @@ def clf_config(clf_dataset, tmp_path):
     model_path.unlink(True)
 
 
-def test_classification_finetune(clf_config):
+def test_classification_finetune(clf_config, tmp_path):
     cfg, model_path, dataset = clf_config
     img_clf = ImageClassification()
     img_clf.finetune(cfg)
@@ -81,6 +87,42 @@ def test_classification_finetune(clf_config):
         "test_temp_predictions",
         gt_field="resnet50",
         eval_key="test_eval_temp",
+    )
+
+    img_clf.predict(
+        dataset.name,
+        label_field="test_temp_patches",
+        ckpt_path=str(model_path),
+        include_tags=["test", "val"],
+        image_size=(224, 112),
+        patch_field="predictions",
+        include_labels={"predictions": ["carrot", "car", "kite"]},
+        max_samples=5,
+    )
+
+    image_size = (250, 125)
+    img_clf.export_triton(ckpt_path=str(model_path),
+                          triton_repo=str(tmp_path / "triton"),
+                          triton_name="image_classifier",
+                          image_size=image_size, version=1)
+    triton_model_path = tmp_path / "triton" / "image_classifier"
+    check_triton_onnx(triton_model_path)
+    check_triton_labels(triton_model_path)
+
+    onnx_path = triton_model_path / "1" / "model.onnx"
+    onnx_model = onnx.load_model(onnx_path)
+    onnx.checker.check_model(onnx_model)
+
+    dummy = img_clf.generate_dummy_inputs(image_size)
+    ort = InferenceSession(str(onnx_path))
+    input_feed = {k: to_numpy(v) for k, v in zip(img_clf.input_names, dummy)}
+    ort_out = ort.run(img_clf.output_names, input_feed)
+    model = img_clf.model.eval()
+    with torch.no_grad():
+        model_out = model(*dummy)
+
+    np.testing.assert_allclose(
+        model_out.numpy(), ort_out[0], atol=1e-4, rtol=1e-2
     )
 
 
@@ -104,9 +146,7 @@ def meta_learn_cfg(clf_dataset, tmp_path):
             dataset=clf_dataset.name,
             label_field=label_field,
             batch_size=2,
-            transform_kwargs={
-                "image_size": (224, 224)
-            }
+            transform_kwargs={"image_size": (224, 224)},
         ),
         model=dict(
             backbone="efficientnet_b0",

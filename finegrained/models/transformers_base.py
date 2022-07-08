@@ -4,19 +4,11 @@ import shutil
 from pathlib import Path
 
 import torch
-from google.protobuf import json_format, text_format
 from transformers import AutoTokenizer, AutoModel
-from tritonclient.grpc import model_config_pb2
 
 from finegrained.models import torch_utils
+from finegrained.models.triton import save_triton_config, init_model_repo
 from finegrained.utils import types
-
-
-def save_triton_config(config: dict, write_file: str):
-    parsed = json_format.ParseDict(config, model_config_pb2.ModelConfig())
-    parsed_bytes = text_format.MessageToBytes(parsed)
-    with open(write_file, "wb") as f:
-        f.write(parsed_bytes)
 
 
 class MeanPooling(torch.nn.Module):
@@ -39,15 +31,16 @@ class MeanPooling(torch.nn.Module):
 
 class TransformersBase:
     def __init__(
-        self,
-        model_name: str,
-        batch_size: int = torch_utils.get_default_batch_size(),
-        device=torch_utils.get_device(),
+            self,
+            model_name: str,
+            batch_size: int = torch_utils.get_default_batch_size(),
+            device=torch_utils.get_device(),
     ):
         self.device = device
         self._tokenizer = AutoTokenizer.from_pretrained(model_name)
         self._model = AutoModel.from_pretrained(model_name).to(device)
-        self.embedding_dim = self._model.embeddings.token_type_embeddings.embedding_dim
+        self.embedding_dim = self._model.embeddings.token_type_embeddings\
+            .embedding_dim
         self.model_name = model_name
         self._batch_size = batch_size
 
@@ -90,7 +83,6 @@ class SentenceEmbeddings(TransformersBase):
         return embeddings
 
     def predict(self, questions):
-
         if isinstance(questions, str):
             questions = [questions]
 
@@ -143,14 +135,9 @@ class SentenceEmbeddings(TransformersBase):
             opset_version=13,
         )
 
-    @staticmethod
-    def _init_model_repo(triton_repo: str, triton_name: str, version: str):
-        model_version_dir = Path(triton_repo) / triton_name / str(version)
-        model_version_dir.mkdir(parents=True, exist_ok=True)
-        return model_version_dir
-
-    def export_triton(self, triton_repo: str, triton_name: str, version: int = 1):
-        model_version_dir = self._init_model_repo(triton_repo, triton_name, version)
+    def export_triton(self, triton_repo: str, triton_name: str,
+                      version: int = 1):
+        model_version_dir = init_model_repo(triton_repo, triton_name, version)
         self.export_onnx(model_version_dir / "model.onnx")
 
         config = self._create_triton_config()
@@ -163,7 +150,7 @@ class SentenceEmbeddings(TransformersBase):
             "max_batch_size": self.batch_size,
         }
 
-    def _create_ensemble_config(self,) -> dict:
+    def _create_ensemble_config(self, ) -> dict:
         return {
             "platform": "ensemble",
             "max_batch_size": self.batch_size,
@@ -211,14 +198,14 @@ class SentenceEmbeddings(TransformersBase):
         }
 
     def export_ensemble(self, triton_repo, triton_name, version=1):
-        model_version_dir = self._init_model_repo(triton_repo, triton_name, version)
+        model_version_dir = init_model_repo(triton_repo, triton_name, version)
 
         config = self._create_ensemble_config()
         write_file = model_version_dir.parent / "config.pbtxt"
         save_triton_config(config, write_file)
 
     def export_tokenizer(self, triton_repo, triton_name, version=1):
-        model_version_dir = self._init_model_repo(triton_repo, triton_name, version)
+        model_version_dir = init_model_repo(triton_repo, triton_name, version)
 
         shutil.copy(Path(__file__).parent / "tokenizer_triton.py",
                     model_version_dir / "model.py")
@@ -252,6 +239,7 @@ class SentenceEmbeddings(TransformersBase):
                 )
             ],
             "parameters": {
-                "EXECUTION_ENV_PATH": {"string_value": "/opt/tritonserver/backends/python/py39.tar.gz"}
+                "EXECUTION_ENV_PATH": {
+                    "string_value": "/opt/tritonserver/backends/python/py39.tar.gz"}
             }
         }

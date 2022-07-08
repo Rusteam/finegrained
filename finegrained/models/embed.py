@@ -3,7 +3,7 @@
 from typing import Dict, List
 
 from finegrained.utils.data import load_data, write_data
-from finegrained.models.huggingface_transformers import SentenceEmbeddings
+from finegrained.models.transformers_base import SentenceEmbeddings
 from finegrained.utils.similarity import SimilaritySearch
 
 

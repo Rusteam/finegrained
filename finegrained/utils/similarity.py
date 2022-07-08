@@ -7,7 +7,7 @@ from typing import List, Dict
 import numpy as np
 from scipy.spatial.distance import cdist
 
-from finegrained.models.huggingface_transformers import SentenceEmbeddings
+from finegrained.models.transformers_base import SentenceEmbeddings
 
 
 @dataclass

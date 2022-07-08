@@ -1,21 +1,44 @@
 """Base logic to use Flash datamodules, models and and trainers.
 """
+import itertools
 from dataclasses import dataclass
 from itertools import chain
+from pathlib import Path
 from typing import Tuple
 
 import torch
 from flash import Trainer
 from flash.core.classification import FiftyOneLabelsOutput
 from tqdm import tqdm
+import fiftyone as fo
 
 from finegrained.data.dataset_utils import load_fiftyone_dataset
 from finegrained.models.torch_utils import get_cuda_count
+from finegrained.models.triton import init_model_repo, save_triton_config
+from finegrained.utils import types
 from finegrained.utils.os_utils import read_yaml
+
+
+def _map_classifications_to_detections(predictions, patches, patch_field) -> dict:
+    paired = []
+    for clf, smp in zip(predictions, patches):
+        detection = fo.Detection(
+            label=clf.label,
+            bounding_box=smp[patch_field].bounding_box,
+            confidence=clf.confidence,
+        )
+        paired.append((detection, smp.sample_id))
+
+    detections = {}
+    key_fn = lambda x: x[1]
+    for key, group in itertools.groupby(paired, key_fn):
+        detections[key] = fo.Detections(detections=[d for d, _ in group])
+    return detections
 
 
 class FlashFiftyOneTask:
     """A base class to inherit from for task-specific learners."""
+
     _model = None
     _data = None
     _prediction_dataset = None
@@ -82,7 +105,7 @@ class FlashFiftyOneTask:
 
     @staticmethod
     def calculate_features(
-            model, dataloader
+        model, dataloader
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Extract embeddings for all samples in a dataloader
 
@@ -111,7 +134,7 @@ class FlashFiftyOneTask:
         self.cfg_keys = dict(
             data=self.data_keys,
             model=self.model_keys,
-            trainer=self.trainer_keys
+            trainer=self.trainer_keys,
         )
 
         for key in self.cfg_keys.keys():
@@ -173,6 +196,7 @@ class FlashFiftyOneTask:
         ckpt_path: str,
         image_size: Tuple[int, int] = (224, 224),
         batch_size: int = 4,
+        patch_field: str = None,
         **kwargs,
     ):
         """Classify samples from a dataset and assign values to label field
@@ -189,14 +213,24 @@ class FlashFiftyOneTask:
             none
         """
         self._init_prediction_datamodule(
-            dataset, image_size=image_size, batch_size=batch_size, **kwargs
+            dataset, image_size=image_size, batch_size=batch_size,
+            patch_field=patch_field, **kwargs
         )
         assert (
             self.prediction_dataset is not None
         ), f"Make sure _init_prediction_datamodule() creates self.prediction_dataset"
         self._load_pretrained_model(ckpt_path)
         predictions = self._predict()
-        self.prediction_dataset.set_values(label_field, predictions)
+        if bool(patch_field):
+            detections = _map_classifications_to_detections(predictions,
+                                                             self.patches,
+                                                             patch_field)
+            for smp_id, det in detections.items():
+                smp = self.prediction_dataset[smp_id]
+                smp[label_field] = det
+                smp.save()
+        else:
+            self.prediction_dataset.set_values(label_field, predictions)
 
     @staticmethod
     def report(
@@ -231,6 +265,62 @@ class FlashFiftyOneTask:
     def list_backbones(self, prefix: str = None):
         backbones = self._get_available_backbones()
         if prefix:
-            backbones = list(filter(lambda x: x.startswith(prefix),
-                                    backbones))
+            backbones = list(filter(lambda x: x.startswith(prefix), backbones))
         return backbones
+
+    @property
+    def input_names(self):
+        return ["image"]
+
+    @property
+    def output_names(self):
+        return ["output"]
+
+    @property
+    def dynamic_axes(self):
+        return {"image": {0: "batch_size"}, "output": {0: "batch_size"}}
+
+    def generate_dummy_inputs(self, *args, **kwargs):
+        raise NotImplementedError("Subclass has to implement this method")
+
+    def export_onnx(
+        self, ckpt_path: str, write_path: str, image_size: types.IMAGE_SIZE
+    ):
+        self._load_pretrained_model(ckpt_path)
+        dummy = self.generate_dummy_inputs(image_size=image_size)
+        torch.onnx.export(
+            self.model,
+            dummy,
+            write_path,
+            input_names=self.input_names,
+            output_names=self.output_names,
+            dynamic_axes=self.dynamic_axes,
+        )
+
+    def _create_triton_config(self, *args, **kwargs):
+        raise NotImplementedError("Subclass has to implement this method")
+
+    @property
+    def has_triton_labels(self) -> bool:
+        return False
+
+    def _export_labels_file(self, filepath: Path):
+        labels = self.model.hparams["labels"]
+        filepath.write_text("\n".join(labels))
+
+    def export_triton(self, ckpt_path: str, triton_repo: str, triton_name: str,
+                      image_size: types.IMAGE_SIZE, version: int = 1):
+        model_version_dir = init_model_repo(triton_repo, triton_name, version)
+        self.export_onnx(ckpt_path, model_version_dir / "model.onnx",
+                         image_size=image_size)
+
+        config = self._create_triton_config(image_size)
+        write_config = model_version_dir.parent / "config.pbtxt"
+        save_triton_config(config, write_config)
+
+        if self.has_triton_labels:
+            self._export_labels_file(model_version_dir.parent / "labels.txt")
+
+    def export_preprocessing(self, triton_repo: str, triton_name: str, version=1):
+        model_version_dir = init_model_repo(triton_repo, triton_name, version)
+

@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 import fiftyone as fo
 import fiftyone.zoo as foz
+import fiftyone.types as fot
 
 from finegrained.data import transforms, tag
 from finegrained.data.dataset_utils import get_unique_labels
@@ -16,9 +17,9 @@ def temp_dataset():
         .take(100)
         .clone("test_transforms_temp")
     )
-    if not dataset.has_sample_field("resnet50"):
+    if len(dataset.exists("resnet50")) < len(dataset):
         model = foz.load_zoo_model("resnet50")
-        dataset.apply(model, label_field="resnet50", batch_size=4)
+        dataset.exists("resnet50", False).apply(model, label_field="resnet50", batch_size=4)
     yield dataset
     fo.delete_dataset(dataset.name)
 
@@ -127,3 +128,62 @@ def test_split_classes(temp_dataset):
         "resnet50.label"
     )
     assert min(label_counts.values()) >= 2
+
+
+def test_merge_diff(temp_dataset, tmp_path):
+    export_dir = tmp_path / "export"
+
+    N = len(temp_dataset)
+    n = 10
+    subset = temp_dataset.take(n)
+
+    # merge all new samples
+    subset.export(export_dir=str(export_dir), dataset_type=fot.ImageDirectory)
+
+    transforms.merge_diff(
+        temp_dataset.name, image_dir=export_dir, tags=["merged_test"]
+    )
+    # extra n samples added
+    assert len(temp_dataset) == N + n
+    assert len(temp_dataset.match_tags("merged_test")) == n
+    # original label fields are not deleted
+    assert len(temp_dataset.exists("resnet50")) == N
+    assert len(temp_dataset.exists("ground_truth")) == N
+
+    # half new, half existing
+    for i, smp in enumerate(subset.take(n // 2).select_fields("filepath")):
+        src_file = Path(smp.filepath)
+        dest_file = export_dir / src_file.name
+        # change name to be considered as a new sample
+        dest_file = dest_file.with_stem(dest_file.stem + "_new")
+        shutil.copy(src_file, dest_file)
+
+    transforms.merge_diff(
+        temp_dataset.name, export_dir, tags=["merged_test_2"]
+    )
+    # extract n//2 samples added
+    assert len(temp_dataset) == N + n + n // 2
+    assert len(temp_dataset.match_tags("merged_test")) == n
+    assert len(temp_dataset.match_tags("merged_test_2")) == n // 2
+    # original samples are unchanged
+    assert len(temp_dataset.exists("resnet50")) == N
+    assert len(temp_dataset.exists("ground_truth")) == N
+
+
+def test_delete_samples(temp_dataset, tmp_path):
+    export_dir = tmp_path / "test_delete"
+    temp_dataset.export(str(export_dir), dataset_type=fot.ImageClassificationDirectoryTree,
+                        label_field="resnet50")
+    dataset = fo.Dataset.from_dir(str(export_dir), dataset_type=fot.ImageClassificationDirectoryTree,
+                                  label_field="ground_truth")
+    N = len(dataset)
+
+    transforms.delete_samples(dataset.name,
+                              include_labels={"ground_truth": ["ski", "zebra"]})
+
+    assert len(dataset) < N
+    assert len(list(Path(export_dir).glob("*.*"))) < N
+    values = dataset.count_values("ground_truth.label")
+    assert len(values) > 0
+    assert "ski" not in values
+    assert "zebra" not in values

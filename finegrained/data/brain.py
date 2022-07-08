@@ -36,3 +36,9 @@ def compute_hardness(dataset: str, predictions: str, **kwargs):
     """
     dataset = load_fiftyone_dataset(dataset, **kwargs)
     fob.compute_hardness(dataset, predictions)
+
+
+def compute_uniqueness(dataset: str, label_field: str = "uniqueness", **kwargs):
+    dataset = load_fiftyone_dataset(dataset, **kwargs)
+    fob.compute_uniqueness(dataset, uniqueness_field=label_field)
+    return dataset
