@@ -9,11 +9,8 @@ from onnxruntime import InferenceSession
 from transformers.utils import to_numpy
 
 from finegrained.models import SentenceEmbeddings
-from tests.models.triton import (
-    check_triton_onnx,
-    check_triton_python,
-    check_triton_ensemble,
-)
+from tests.models.test_export import _check_triton_onnx, _check_triton_python, \
+    _check_triton_ensemble
 
 SENTENCE_EMBEDDINGS = ["symanto/sn-xlm-roberta-base-snli-mnli-anli-xnli"]
 
@@ -50,7 +47,7 @@ def test_triton(model_name, tmp_path):
     sent_emb.export_triton(repo_dir, "sent_emb", version=1)
 
     export_dir = Path(repo_dir) / "sent_emb"
-    check_triton_onnx(export_dir)
+    _check_triton_onnx(export_dir)
 
 
 @pytest.mark.parametrize("model_name", SENTENCE_EMBEDDINGS)
@@ -58,7 +55,7 @@ def test_triton_python_backend(model_name, tmp_path):
     model = SentenceEmbeddings(model_name)
     export_dir = Path(tmp_path) / "triton"
     model.export_tokenizer(export_dir, "tokenizer", version=1)
-    check_triton_python(export_dir)
+    _check_triton_python(export_dir)
 
 
 @pytest.mark.parametrize("model_name", SENTENCE_EMBEDDINGS)
@@ -66,4 +63,4 @@ def test_triton_ensemble(model_name, tmp_path):
     model = SentenceEmbeddings(model_name)
     export_dir = Path(tmp_path) / "triton"
     model.export_ensemble(export_dir, "ensemble", version=1)
-    check_triton_ensemble(export_dir)
+    _check_triton_ensemble(export_dir)

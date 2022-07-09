@@ -1,7 +1,6 @@
 """Base logic to use Flash datamodules, models and and trainers.
 """
 import itertools
-from dataclasses import dataclass
 from itertools import chain
 from pathlib import Path
 from typing import Tuple
@@ -14,7 +13,7 @@ import fiftyone as fo
 
 from finegrained.data.dataset_utils import load_fiftyone_dataset
 from finegrained.models.torch_utils import get_cuda_count
-from finegrained.models.triton import init_model_repo, save_triton_config
+from finegrained.utils.triton import init_model_repo, save_triton_config
 from finegrained.utils import types
 from finegrained.utils.os_utils import read_yaml
 
@@ -267,60 +266,3 @@ class FlashFiftyOneTask:
         if prefix:
             backbones = list(filter(lambda x: x.startswith(prefix), backbones))
         return backbones
-
-    @property
-    def input_names(self):
-        return ["image"]
-
-    @property
-    def output_names(self):
-        return ["output"]
-
-    @property
-    def dynamic_axes(self):
-        return {"image": {0: "batch_size"}, "output": {0: "batch_size"}}
-
-    def generate_dummy_inputs(self, *args, **kwargs):
-        raise NotImplementedError("Subclass has to implement this method")
-
-    def export_onnx(
-        self, ckpt_path: str, write_path: str, image_size: types.IMAGE_SIZE
-    ):
-        self._load_pretrained_model(ckpt_path)
-        dummy = self.generate_dummy_inputs(image_size=image_size)
-        torch.onnx.export(
-            self.model,
-            dummy,
-            write_path,
-            input_names=self.input_names,
-            output_names=self.output_names,
-            dynamic_axes=self.dynamic_axes,
-        )
-
-    def _create_triton_config(self, *args, **kwargs):
-        raise NotImplementedError("Subclass has to implement this method")
-
-    @property
-    def has_triton_labels(self) -> bool:
-        return False
-
-    def _export_labels_file(self, filepath: Path):
-        labels = self.model.hparams["labels"]
-        filepath.write_text("\n".join(labels))
-
-    def export_triton(self, ckpt_path: str, triton_repo: str, triton_name: str,
-                      image_size: types.IMAGE_SIZE, version: int = 1):
-        model_version_dir = init_model_repo(triton_repo, triton_name, version)
-        self.export_onnx(ckpt_path, model_version_dir / "model.onnx",
-                         image_size=image_size)
-
-        config = self._create_triton_config(image_size)
-        write_config = model_version_dir.parent / "config.pbtxt"
-        save_triton_config(config, write_config)
-
-        if self.has_triton_labels:
-            self._export_labels_file(model_version_dir.parent / "labels.txt")
-
-    def export_preprocessing(self, triton_repo: str, triton_name: str, version=1):
-        model_version_dir = init_model_repo(triton_repo, triton_name, version)
-

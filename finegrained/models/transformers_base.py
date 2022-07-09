@@ -7,7 +7,7 @@ import torch
 from transformers import AutoTokenizer, AutoModel
 
 from finegrained.models import torch_utils
-from finegrained.models.triton import save_triton_config, init_model_repo
+from finegrained.utils.triton import save_triton_config, init_model_repo
 from finegrained.utils import types
 
 
@@ -31,16 +31,17 @@ class MeanPooling(torch.nn.Module):
 
 class TransformersBase:
     def __init__(
-            self,
-            model_name: str,
-            batch_size: int = torch_utils.get_default_batch_size(),
-            device=torch_utils.get_device(),
+        self,
+        model_name: str,
+        batch_size: int = torch_utils.get_default_batch_size(),
+        device=torch_utils.get_device(),
     ):
         self.device = device
         self._tokenizer = AutoTokenizer.from_pretrained(model_name)
         self._model = AutoModel.from_pretrained(model_name).to(device)
-        self.embedding_dim = self._model.embeddings.token_type_embeddings\
-            .embedding_dim
+        self.embedding_dim = (
+            self._model.embeddings.token_type_embeddings.embedding_dim
+        )
         self.model_name = model_name
         self._batch_size = batch_size
 
@@ -78,8 +79,9 @@ class SentenceEmbeddings(TransformersBase):
     @torch.no_grad()
     def model(self, tokens: dict) -> torch.Tensor:
         model_output = self._model(**tokens)
-        embeddings = MeanPooling().forward(model_output,
-                                           tokens["attention_mask"])
+        embeddings = MeanPooling().forward(
+            model_output, tokens["attention_mask"]
+        )
         return embeddings
 
     def predict(self, questions):
@@ -135,8 +137,9 @@ class SentenceEmbeddings(TransformersBase):
             opset_version=13,
         )
 
-    def export_triton(self, triton_repo: str, triton_name: str,
-                      version: int = 1):
+    def export_triton(
+        self, triton_repo: str, triton_name: str, version: int = 1
+    ):
         model_version_dir = init_model_repo(triton_repo, triton_name, version)
         self.export_onnx(model_version_dir / "model.onnx")
 
@@ -150,28 +153,20 @@ class SentenceEmbeddings(TransformersBase):
             "max_batch_size": self.batch_size,
         }
 
-    def _create_ensemble_config(self, ) -> dict:
+    def _create_ensemble_config(
+        self,
+    ) -> dict:
         return {
             "platform": "ensemble",
             "max_batch_size": self.batch_size,
-            "input": [
-                dict(
-                    name="TEXT",
-                    data_type="TYPE_STRING",
-                    dims=[-1]
-                )
-            ],
+            "input": [dict(name="TEXT", data_type="TYPE_STRING", dims=[-1])],
             "output": [
-                dict(
-                    name="ATTENTION_MASK",
-                    data_type="TYPE_INT64",
-                    dims=[-1]
-                ),
+                dict(name="ATTENTION_MASK", data_type="TYPE_INT64", dims=[-1]),
                 dict(
                     name="EMBEDDINGS",
                     data_type="TYPE_FP32",
-                    dims=[-1, self.embedding_dim]
-                )
+                    dims=[-1, self.embedding_dim],
+                ),
             ],
             "ensemble_scheduling": dict(
                 step=[
@@ -181,8 +176,8 @@ class SentenceEmbeddings(TransformersBase):
                         input_map=dict(text="TEXT"),
                         output_map=dict(
                             input_ids="INPUT_IDS",
-                            attention_mask="ATTENTION_MASK"
-                        )
+                            attention_mask="ATTENTION_MASK",
+                        ),
                     ),
                     dict(
                         model_name="sentence_embeddings",
@@ -191,10 +186,10 @@ class SentenceEmbeddings(TransformersBase):
                             input_ids="INPUT_IDS",
                             attention_mask="ATTENTION_MASK",
                         ),
-                        output_map=dict(embeddings="EMBEDDINGS")
+                        output_map=dict(embeddings="EMBEDDINGS"),
                     ),
                 ]
-            )
+            ),
         }
 
     def export_ensemble(self, triton_repo, triton_name, version=1):
@@ -207,8 +202,13 @@ class SentenceEmbeddings(TransformersBase):
     def export_tokenizer(self, triton_repo, triton_name, version=1):
         model_version_dir = init_model_repo(triton_repo, triton_name, version)
 
-        shutil.copy(Path(__file__).parent / "tokenizer_triton.py",
-                    model_version_dir / "model.py")
+        shutil.copy(
+            Path(__file__).parents[1]
+            / "utils"
+            / "triton_python"
+            / "transformers_tokenizer.py",
+            model_version_dir / "model.py",
+        )
 
         config = self._create_tokenizer_config()
         write_config = model_version_dir.parent / "config.pbtxt"
@@ -219,27 +219,14 @@ class SentenceEmbeddings(TransformersBase):
         return {
             "backend": "python",
             "max_batch_size": 16,
-            "input": [
-                dict(
-                    name="text",
-                    data_type="TYPE_STRING",
-                    dims=[-1]
-                )
-            ],
+            "input": [dict(name="text", data_type="TYPE_STRING", dims=[-1])],
             "output": [
-                dict(
-                    name="input_ids",
-                    data_type="TYPE_INT64",
-                    dims=[-1]
-                ),
-                dict(
-                    name="attention_mask",
-                    data_type="TYPE_INT64",
-                    dims=[-1]
-                )
+                dict(name="input_ids", data_type="TYPE_INT64", dims=[-1]),
+                dict(name="attention_mask", data_type="TYPE_INT64", dims=[-1]),
             ],
             "parameters": {
                 "EXECUTION_ENV_PATH": {
-                    "string_value": "/opt/tritonserver/backends/python/py39.tar.gz"}
-            }
+                    "string_value": "/opt/tritonserver/backends/python/py39.tar.gz"
+                }
+            },
         }
