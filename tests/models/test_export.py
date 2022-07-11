@@ -15,6 +15,8 @@ from transformers.utils import to_numpy
 
 from finegrained.models import ImageClassification, ImageTransform
 from finegrained.models.image_classification import SoftmaxClassifier
+from finegrained.models.yolo import YOLOv5Preprocessing, YOLOv5Postprocessing, \
+    YOLOv5Model
 
 
 @pytest.fixture(scope="module")
@@ -103,6 +105,69 @@ def test_img_transforms(triton_repo):
     _verify_model_outputs(img_T, str(onnx_path), dummy)
 
 
+def test_yolov5_model(triton_repo, tmp_path):
+    src = tmp_path / "temp_file.onnx"
+    open(src, "wb").close()
+
+    model = YOLOv5Model()
+    model.export_triton(
+        ckpt_path=str(src),
+        triton_repo=triton_repo,
+        triton_name="v5_model",
+        version=1,
+    )
+
+    _check_triton_onnx(triton_repo / "v5_model")
+
+    model.export_triton_ensemble(
+        triton_repo=str(triton_repo),
+        triton_name="v5_ensemble",
+        version=1,
+        preprocessing_name="v5_prep",
+        model_name="v5_model",
+        postprocessing_name="v5_post",
+    )
+
+    _check_triton_ensemble(triton_repo / "v5_model")
+
+
+def test_yolov5_prep(triton_repo):
+    image_size = 320
+    v5_prep = YOLOv5Preprocessing(image_size=image_size)
+    v5_prep.export_triton(
+        ckpt_path="",
+        triton_repo=triton_repo,
+        triton_name="v5_prep",
+    )
+
+    triton_model_path = triton_repo / "v5_prep"
+    onnx_path = triton_model_path / "1" / "model.onnx"
+    _check_triton_onnx(triton_model_path)
+    _check_onnx_model(onnx_path)
+
+    dummy = v5_prep.generate_dummy_inputs()
+    _verify_model_outputs(v5_prep, str(onnx_path), dummy)
+
+
+def test_yolov5_post(triton_repo):
+    n_classes = 1
+    v5_post = YOLOv5Postprocessing(n_classes=n_classes)
+    v5_post.export_triton(
+        ckpt_path="",
+        triton_repo=triton_repo,
+        triton_name="v5_post",
+        image_size=None
+    )
+
+    triton_model_path = triton_repo / "v5_post"
+    onnx_path = triton_model_path / "1" / "model.onnx"
+    _check_triton_onnx(triton_model_path)
+    _check_onnx_model(onnx_path)
+
+    dummy = v5_post.generate_dummy_inputs()
+    _verify_model_outputs(v5_post, str(onnx_path), dummy)
+
+
 def _verify_model_outputs(
     model: torch.nn.Module, onnx_path: str, dummy: List[torch.Tensor]
 ):
@@ -116,9 +181,13 @@ def _verify_model_outputs(
     with torch.no_grad():
         model_out = model(*dummy)
 
-    torch.testing.assert_allclose(
-        model_out, torch.tensor(ort_out[0]), atol=1e-2, rtol=5e-2
-    )
+    if isinstance(model_out, torch.Tensor):
+        model_out = [model_out]
+
+    for expected, actual in zip(model_out, ort_out):
+        torch.testing.assert_allclose(
+            expected, torch.tensor(actual), atol=1e-2, rtol=5e-2
+        )
 
 
 def _check_triton_onnx(model_dir):

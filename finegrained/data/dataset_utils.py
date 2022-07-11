@@ -53,6 +53,8 @@ def load_fiftyone_dataset(
             dataset = dataset.exists(field, False)
     if bool(max_samples):
         dataset = dataset.take(min(max_samples, len(dataset)))
+
+    assert len(dataset) > 0, "No samples left after filtering the dataset"
     return dataset
 
 

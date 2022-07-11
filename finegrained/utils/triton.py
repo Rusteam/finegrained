@@ -91,7 +91,7 @@ class TritonExporter:
         self.non_implemented()
 
     def export_onnx(
-        self, model_path: str, write_path: str, image_size: types.IMAGE_SIZE
+        self, model_path: str, write_path: str, **kwargs
     ):
         """Create an ONNX model from a torch model.
 
@@ -101,7 +101,7 @@ class TritonExporter:
             image_size: model input size
         """
         model = self._load_model_torch(model_path)
-        dummy = self.generate_dummy_inputs(image_size=image_size)
+        dummy = self.generate_dummy_inputs(**kwargs)
         torch.onnx.export(
             model,
             dummy,
@@ -116,8 +116,8 @@ class TritonExporter:
         ckpt_path: str,
         triton_repo: str,
         triton_name: str,
-        image_size: types.IMAGE_SIZE,
         version: int = 1,
+        **kwargs,
     ):
         """Create a Triton model from a torch model.
 
@@ -132,12 +132,10 @@ class TritonExporter:
 
         if ckpt_path is not None:
             self.export_onnx(
-                ckpt_path,
-                model_version_dir / "model.onnx",
-                image_size=image_size,
+                ckpt_path, model_version_dir / "model.onnx", **kwargs
             )
 
-        if config := self._create_triton_config(image_size):
+        if config := self._create_triton_config(**kwargs):
             write_config = model_version_dir.parent / "config.pbtxt"
             save_triton_config(config, write_config)
 
@@ -150,15 +148,18 @@ class TritonExporter:
             f"Triton-onnx model has been exported to {str(model_version_dir.parent)}"
         )
 
-    def export_triton_ensemble(self, triton_repo: str, triton_name: str, version: int = 1,
-                               **kwargs):
+    def export_triton_ensemble(
+        self, triton_repo: str, triton_name: str, version: int = 1, **kwargs
+    ):
         model_version_dir = init_model_repo(triton_repo, triton_name, version)
 
         if config := self._create_triton_ensemble_config(**kwargs):
             write_config = model_version_dir.parent / "config.pbtxt"
             save_triton_config(config, write_config)
 
-        print(f"Triton-ensemble has been exported to {str(model_version_dir.parent)}")
+        print(
+            f"Triton-ensemble has been exported to {str(model_version_dir.parent)}"
+        )
 
     def export_triton_python(
         self, triton_repo: str, triton_name: str, version: int = 1, **kwargs
@@ -187,8 +188,10 @@ class TritonExporter:
             _export_txt_file(names, model_version_dir.parent / "names.txt")
 
         if "labels" in kwargs:
-            shutil.copy(kwargs["labels"],
-                        model_version_dir.parent / self.triton_labels_path)
+            shutil.copy(
+                kwargs["labels"],
+                model_version_dir.parent / self.triton_labels_path,
+            )
 
         print(
             f"Triton-python model has been exported to {str(model_version_dir.parent)}"
