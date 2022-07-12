@@ -141,7 +141,7 @@ class ImageClassification(FlashFiftyOneTask, TritonExporter):
         h, w = parse_image_size(image_size)
         return (torch.randn(2, 3, h, w),)
 
-    def _create_triton_config(self, image_size: types.IMAGE_SIZE) -> dict:
+    def _create_triton_config(self, image_size: types.IMAGE_SIZE, **kwargs) -> dict:
         h, w = parse_image_size(image_size)
         return {
             "backend": "onnxruntime",

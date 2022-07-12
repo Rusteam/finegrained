@@ -59,7 +59,7 @@ class TritonExporter:
 
     @property
     def triton_labels(self) -> List[str]:
-        return None
+        return []
 
     @property
     def triton_labels_path(self) -> str:
@@ -111,12 +111,19 @@ class TritonExporter:
             dynamic_axes=self.dynamic_axes,
         )
 
+    def export_torchscirpt(self, write_path, **kwargs):
+        model = self._load_model_torch(**kwargs)
+        dummy = self.generate_dummy_inputs(**kwargs)
+        scripted = torch.jit.script(model, example_inputs=dummy)
+        torch.jit.save(scripted, write_path)
+
     def export_triton(
         self,
         ckpt_path: str,
         triton_repo: str,
         triton_name: str,
         version: int = 1,
+        torchscript: bool = False,
         **kwargs,
     ):
         """Create a Triton model from a torch model.
@@ -125,17 +132,21 @@ class TritonExporter:
             ckpt_path: load a trained model from flash this checkpoint
             triton_repo: triton model repository path
             triton_name: triton model name
-            image_size: model input size
             version: triton model version
+            torchscript: if True, then export in torchscript format rather
+                than ONNX
         """
         model_version_dir = init_model_repo(triton_repo, triton_name, version)
 
         if ckpt_path is not None:
-            self.export_onnx(
-                ckpt_path, model_version_dir / "model.onnx", **kwargs
-            )
+            if torchscript:
+                self.export_torchscirpt(write_path=model_version_dir / "model.pt", **kwargs)
+            else:
+                self.export_onnx(
+                    ckpt_path, model_version_dir / "model.onnx", **kwargs
+                )
 
-        if config := self._create_triton_config(**kwargs):
+        if config := self._create_triton_config(torchscript=torchscript, **kwargs):
             write_config = model_version_dir.parent / "config.pbtxt"
             save_triton_config(config, write_config)
 
