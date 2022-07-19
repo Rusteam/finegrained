@@ -19,7 +19,9 @@ def temp_dataset():
     )
     if len(dataset.exists("resnet50")) < len(dataset):
         model = foz.load_zoo_model("resnet50")
-        dataset.exists("resnet50", False).apply(model, label_field="resnet50", batch_size=4)
+        dataset.exists("resnet50", False).apply(
+            model, label_field="resnet50", batch_size=4
+        )
     yield dataset
     fo.delete_dataset(dataset.name)
 
@@ -172,14 +174,21 @@ def test_merge_diff(temp_dataset, tmp_path):
 
 def test_delete_samples(temp_dataset, tmp_path):
     export_dir = tmp_path / "test_delete"
-    temp_dataset.export(str(export_dir), dataset_type=fot.ImageClassificationDirectoryTree,
-                        label_field="resnet50")
-    dataset = fo.Dataset.from_dir(str(export_dir), dataset_type=fot.ImageClassificationDirectoryTree,
-                                  label_field="ground_truth")
+    temp_dataset.export(
+        str(export_dir),
+        dataset_type=fot.ImageClassificationDirectoryTree,
+        label_field="resnet50",
+    )
+    dataset = fo.Dataset.from_dir(
+        str(export_dir),
+        dataset_type=fot.ImageClassificationDirectoryTree,
+        label_field="ground_truth",
+    )
     N = len(dataset)
 
-    transforms.delete_samples(dataset.name,
-                              include_labels={"ground_truth": ["ski", "zebra"]})
+    transforms.delete_samples(
+        dataset.name, include_labels={"ground_truth": ["ski", "zebra"]}
+    )
 
     assert len(dataset) < N
     assert len(list(Path(export_dir).glob("*.*"))) < N
@@ -187,3 +196,54 @@ def test_delete_samples(temp_dataset, tmp_path):
     assert len(values) > 0
     assert "ski" not in values
     assert "zebra" not in values
+
+
+@pytest.mark.parametrize("to_field,mapping", [
+    ("new_labels", dict(
+        carrot="veg", car="transport", boat="transport", broccoli="veg"
+    )),
+    ("same_field", {}),
+])
+def test_map_labels(temp_dataset, to_field, mapping):
+    transforms.map_labels(
+        dataset=temp_dataset.name,
+        from_field="predictions",
+        to_field=to_field,
+        label_mapping=mapping,
+    )
+
+    assert temp_dataset.has_sample_field("predictions")
+    assert temp_dataset.has_sample_field(to_field)
+
+    uniq_src = get_unique_labels(temp_dataset, "predictions")
+    uniq_dest = get_unique_labels(temp_dataset, to_field)
+
+    if bool(mapping):
+        assert all([k in uniq_src for k in mapping.keys()])
+        assert all([k not in uniq_src for k in mapping.values()])
+
+        assert all([k in uniq_dest for k in mapping.values()])
+        assert all([k not in uniq_dest for k in mapping.keys()])
+    else:
+        assert uniq_src == uniq_dest
+
+
+def test_from_labels(temp_dataset):
+    new_field = "test_from_fields"
+    transforms.map_labels(
+        dataset=temp_dataset.name,
+        from_field="predictions",
+        to_field=new_field,
+        label_mapping=None
+    )
+
+    transforms.from_labels(
+        dataset=temp_dataset.name,
+        label_field=new_field,
+        from_field="resnet50"
+    )
+
+    expected_labels = get_unique_labels(temp_dataset, "resnet50")
+    actual_labels = get_unique_labels(temp_dataset, new_field)
+
+    assert all([l in expected_labels for l in actual_labels])

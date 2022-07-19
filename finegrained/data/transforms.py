@@ -171,3 +171,53 @@ def exif_transpose(dataset: str, **kwargs):
         orig = Image.open(smp.filepath)
         transposed = ImageOps.exif_transpose(orig)
         transposed.save(smp.filepath)
+
+
+def map_labels(
+    dataset: str, from_field: str, to_field: str, label_mapping: dict, **kwargs
+) -> fo.DatasetView:
+    """Create a new dataset field with mapped labels.
+
+    Args:
+        dataset: fiftyone dataset name
+        from_field: source label field
+        to_field: a new label field
+        label_mapping: label mapping (use {}/None for creating a field copy)
+        **kwargs: dataset loading kwargs
+
+    Returns:
+        dataset view
+    """
+    dataset = load_fiftyone_dataset(dataset, **kwargs)
+    dataset.clone_sample_field(from_field, to_field)
+    if bool(label_mapping):
+        dataset = dataset.map_labels(to_field, label_mapping)
+        dataset.save(to_field)
+    return dataset
+
+
+def _update_labels(labels: fo.Label, new_label: str):
+    for one in labels.detections:
+        one.label = new_label
+
+
+def from_labels(dataset: str, label_field: str, from_field: str, **kwargs):
+    """Re-assign classification label to detection labels.
+
+    Args:
+        dataset: fiftyone dataset name
+        label_field: a field with detections to be updated
+        from_field: a field with classification to get labels from
+        **kwargs: dataset loading filters
+    """
+    dataset = load_fiftyone_dataset(dataset, **kwargs)
+    dataset = dataset.exists(label_field)
+
+    assert dataset.has_sample_field(label_field), f"Dataset does not contain {label_field=}."
+    assert (doc_type := dataset.get_field(label_field).document_type) == fo.Detections, f"{label_field=} has to be of type Detections, got {doc_type=}."
+    assert dataset.has_sample_field(from_field), f"Dataset does not contain {from_field=}."
+    assert (doc_type := dataset.get_field(from_field).document_type) == fo.Classification, f"{from_field=} has to be of type Detections, got {doc_type=}."
+
+    for smp in tqdm(dataset.select_fields([label_field, from_field])):
+        _update_labels(smp[label_field], smp[from_field].label)
+        smp.save()
