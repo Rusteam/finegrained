@@ -7,9 +7,10 @@ from PIL import Image, ImageOps
 from fiftyone.types import ImageClassificationDirectoryTree
 from tqdm import tqdm
 
-from .dataset_utils import load_fiftyone_dataset, create_fiftyone_dataset
 from ..utils import types
+from ..utils.dataset import load_fiftyone_dataset, create_fiftyone_dataset
 from ..utils.general import parse_list_str
+from ..utils.os_utils import read_yaml
 
 
 def _export_patches(
@@ -221,3 +222,41 @@ def from_labels(dataset: str, label_field: str, from_field: str, **kwargs):
     for smp in tqdm(dataset.select_fields([label_field, from_field])):
         _update_labels(smp[label_field], smp[from_field].label)
         smp.save()
+
+
+def combine_datasets(dest_name: str, label_field: str, cfg: str, persistent: bool = True):
+    """Create a new dataset by adding samples from multiple datasets.
+
+    List of datasets and filters are specified in a yaml config file.
+    Source label fields will be renamed to a destination label field.
+
+    Args:
+        dest_name: a new dataset name
+        label_field: a new label field
+        cfg: path to yaml config
+        persistent: whether to persist destination dataset (False for testing)
+
+    Returns:
+        a dataset instance
+    """
+    cfg = read_yaml(cfg)
+    assert "datasets" in cfg and isinstance(dataset_cfg := cfg["datasets"], list)
+    assert len(dataset_cfg) > 0
+
+    dataset = create_fiftyone_dataset(dest_name, src=None, persistent=persistent)
+    for one in dataset_cfg:
+        assert "name" in one and isinstance(one["name"], str)
+        assert "filters" in one and isinstance(one["filters"], dict)
+        assert "label_field" in one and isinstance(one["label_field"], str)
+
+        temp_name = f"{dest_name}_{one['name']}"
+        temp = load_fiftyone_dataset(one["name"], **one["filters"])\
+                                    .clone(name=temp_name, persistent=False)
+        temp.clone_sample_field(one["label_field"], label_field)
+        if "tag" in one:
+            temp.tag_samples(one["tag"])
+
+        dataset.add_samples(temp.select_fields([label_field, "tags"]))
+        fo.delete_dataset(temp_name)
+
+    return dataset

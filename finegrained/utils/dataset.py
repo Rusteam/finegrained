@@ -65,11 +65,11 @@ def create_fiftyone_dataset(
     overwrite: bool = False,
     persistent: bool = True,
 ) -> fo.Dataset:
-    """Create a fiftyone dataset
+    """Create a fiftyone dataset from a directory (or an empty dataset)
 
     Args:
         name: a name for this dataset
-        src: dataset directory
+        src: dataset directory (if None, an empty dataset will be created)
         dataset_type: fiftyone dataset format
         overwrite: whether to overwrite if that name is already taken
         persistent: whether to persist this dataset in mongo
@@ -83,11 +83,16 @@ def create_fiftyone_dataset(
         )
     elif overwrite and exists:
         fo.delete_dataset(name, verbose=True)
-    dataset = fo.Dataset.from_dir(
-        dataset_dir=src,
-        dataset_type=dataset_type,
-        name=name,
-    )
+
+    if src:
+        dataset = fo.Dataset.from_dir(
+            dataset_dir=src,
+            dataset_type=dataset_type,
+            name=name,
+        )
+    else:
+        dataset = fo.Dataset(name)
+
     if persistent:
         dataset.persistent = True
     return dataset

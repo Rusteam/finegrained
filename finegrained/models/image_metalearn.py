@@ -3,26 +3,20 @@
 from typing import Tuple
 
 import fiftyone.core.labels as fol
-import torch
 from fiftyone import Dataset
-from flash import DataModule, Trainer
+from flash import DataModule
 from flash.image import (
     ImageClassificationData,
     ImageClassifier,
 )
-from learn2learn.nn import PrototypicalClassifier
-from torch.utils.data import DataLoader
-from tqdm import tqdm
 
-from finegrained.data.dataset_utils import (
+from finegrained.utils.dataset import (
     load_fiftyone_dataset,
     get_all_filepaths,
 )
 from finegrained.models.flash_base import FlashFiftyOneTask
 from finegrained.models.flash_transforms import get_transform
-from finegrained.models.torch_utils import get_cuda_count
 from finegrained.utils import types
-from finegrained.utils.os_utils import read_yaml
 
 
 # TODO turn into a class
@@ -142,6 +136,8 @@ class ImageMetalearn(FlashFiftyOneTask):
         self.model = ImageClassifier.load_from_checkpoint(ckpt_path)
 
     def _predict(self):
+        from learn2learn.nn import PrototypicalClassifier
+
         support_features, support_labels = self.calculate_features(
             self.model, self.support_data.train_dataloader()
         )

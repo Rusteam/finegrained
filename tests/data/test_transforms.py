@@ -7,7 +7,8 @@ import fiftyone.zoo as foz
 import fiftyone.types as fot
 
 from finegrained.data import transforms, tag
-from finegrained.data.dataset_utils import get_unique_labels
+from finegrained.utils.dataset import get_unique_labels
+from finegrained.utils.os_utils import write_yaml
 
 
 @pytest.fixture(scope="module")
@@ -247,3 +248,51 @@ def test_from_labels(temp_dataset):
     actual_labels = get_unique_labels(temp_dataset, new_field)
 
     assert all([l in expected_labels for l in actual_labels])
+
+
+
+@pytest.fixture(scope="function")
+def combine_cfg_path(tmp_path):
+    cfg = dict(
+        datasets=[
+            dict(
+                name="quickstart",
+                filters=dict(
+                    include_tags="test"
+                ),
+                label_field="ground_truth",
+                tag="test"
+            ),
+            dict(
+                name="quickstart",
+                filters=dict(
+                    include_labels=dict(ground_truth=["broccoli", "cake", "car", "cell phone", "chair", "clock"])
+                ),
+                label_field="ground_truth",
+                tag="train",
+            ),
+            dict(
+                name="quickstart",
+                filters=dict(
+                    include_labels=dict(ground_truth=["bear", "bed", "banana"]),
+                ),
+                label_field="ground_truth",
+                tag="val",
+            ),
+        ]
+    )
+    write_path = tmp_path / "cfg.yaml"
+    write_yaml(cfg, write_path)
+    return write_path
+
+
+def test_combine_datasets(combine_cfg_path):
+    new_name = "combo_test_delete"
+    label_field = "combo_field"
+    dataset = transforms.combine_datasets(new_name, label_field,
+                                          combine_cfg_path, persistent=False)
+
+    tags = dataset.count_sample_tags()
+    assert all([x in tags for x in ["train", "val", "test"]])
+
+    assert dataset.has_sample_field(label_field)

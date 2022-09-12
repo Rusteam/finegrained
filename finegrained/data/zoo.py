@@ -10,7 +10,7 @@ from torchvision.models.detection import (
 import fiftyone as fo
 from tqdm import tqdm
 
-from finegrained.data.dataset_utils import load_fiftyone_dataset
+from finegrained.utils.dataset import load_fiftyone_dataset
 from finegrained.models.torch_utils import get_device
 
 

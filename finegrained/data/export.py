@@ -4,7 +4,7 @@ from typing import List
 
 import fiftyone.types as fot
 
-from finegrained.data.dataset_utils import (
+from finegrained.utils.dataset import (
     load_fiftyone_dataset,
     get_unique_labels,
 )

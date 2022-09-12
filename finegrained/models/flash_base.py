@@ -2,7 +2,6 @@
 """
 import itertools
 from itertools import chain
-from pathlib import Path
 from typing import Tuple
 
 import torch
@@ -11,10 +10,8 @@ from flash.core.classification import FiftyOneLabelsOutput
 from tqdm import tqdm
 import fiftyone as fo
 
-from finegrained.data.dataset_utils import load_fiftyone_dataset
+from finegrained.utils.dataset import load_fiftyone_dataset
 from finegrained.models.torch_utils import get_cuda_count
-from finegrained.utils.triton import init_model_repo, save_triton_config
-from finegrained.utils import types
 from finegrained.utils.os_utils import read_yaml
 
 

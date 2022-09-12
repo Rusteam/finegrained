@@ -1,12 +1,11 @@
 """Tag or untag samples with specific filters or condition
 """
 from fiftyone import ViewField as F
-from fiftyone.utils import splits as fous
+from fiftyone.utils import random as four
 from sklearn.model_selection import train_test_split
 
-from finegrained.data.dataset_utils import (
+from finegrained.utils.dataset import (
     load_fiftyone_dataset,
-    get_unique_labels,
 )
 from finegrained.utils import types
 from finegrained.utils.general import parse_list_str
@@ -42,7 +41,7 @@ def split_dataset(
         a dict of split counts
     """
     dataset = load_fiftyone_dataset(dataset)
-    fous.random_split(dataset, splits)
+    four.random_split(dataset, splits)
     return dataset.count_sample_tags()
 
 

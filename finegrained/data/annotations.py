@@ -3,8 +3,8 @@
 from pathlib import Path
 from typing import Optional, Any
 
-from .dataset_utils import load_fiftyone_dataset
 from ..utils import types
+from ..utils.dataset import load_fiftyone_dataset
 from ..utils.os_utils import read_txt, read_file_config
 
 

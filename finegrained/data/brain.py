@@ -2,7 +2,7 @@
 """
 import fiftyone.brain as fob
 
-from finegrained.data.dataset_utils import load_fiftyone_dataset
+from finegrained.utils.dataset import load_fiftyone_dataset
 
 
 def compute_mistakenness(

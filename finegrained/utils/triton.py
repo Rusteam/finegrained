@@ -6,7 +6,6 @@ from typing import List
 
 import torch
 from google.protobuf import json_format, text_format
-from tritonclient.grpc import model_config_pb2
 
 from finegrained.utils import types
 
@@ -21,6 +20,8 @@ def save_triton_config(config: dict, write_file: str) -> None:
     Returns:
         None
     """
+    from tritonclient.grpc import model_config_pb2
+
     parsed = json_format.ParseDict(config, model_config_pb2.ModelConfig())
     parsed_bytes = text_format.MessageToBytes(parsed)
     with open(write_file, "wb") as f:

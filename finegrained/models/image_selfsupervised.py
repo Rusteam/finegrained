@@ -2,7 +2,7 @@
 """
 from flash.image import ImageClassificationData, ImageEmbedder
 
-from finegrained.data.dataset_utils import load_fiftyone_dataset
+from finegrained.utils.dataset import load_fiftyone_dataset
 from finegrained.models.flash_base import FlashFiftyOneTask
 
 # TODO finish here

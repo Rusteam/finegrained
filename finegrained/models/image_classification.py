@@ -1,14 +1,11 @@
 """Train, evaluate and predict with image classification models.
 """
-from abc import ABC
 from pathlib import Path
 from typing import Tuple
 
 import numpy as np
 import torch
 from PIL import Image
-from fiftyone import Dataset
-from flash import DataModule
 from flash.core.data.utilities.classification import SingleLabelTargetFormatter
 from flash.image import (
     ImageClassificationData,
@@ -16,14 +13,14 @@ from flash.image import (
 )
 from torchvision import transforms as T
 
-from finegrained.data.dataset_utils import (
+from finegrained.utils.dataset import (
     load_fiftyone_dataset,
     get_unique_labels,
 )
 from finegrained.models.flash_base import FlashFiftyOneTask
 from finegrained.models.flash_transforms import get_transform
-from finegrained.utils.triton import init_model_repo, TritonExporter
 from finegrained.utils import types
+from finegrained.utils.triton import TritonExporter
 
 
 # TODO split before training
@@ -97,7 +94,7 @@ class ImageClassification(FlashFiftyOneTask, TritonExporter):
         batch_size: int = 4,
         patch_field: str = None,
         **kwargs,
-    ) -> Tuple[DataModule, Dataset]:
+    ):
         self.prediction_dataset = load_fiftyone_dataset(dataset, **kwargs)
         if bool(patch_field):
             assert self.prediction_dataset.has_sample_field(patch_field)
