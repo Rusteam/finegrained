@@ -10,13 +10,13 @@ from tqdm import tqdm
 from ..utils import types
 from ..utils.dataset import load_fiftyone_dataset, create_fiftyone_dataset
 from ..utils.general import parse_list_str
-from ..utils.os_utils import read_yaml
+from ..utils.os_utils import read_yaml, read_json, write_json
 
 
 def _export_patches(
-    dataset: fo.Dataset,
-    label_field: str,
-    export_dir: str,
+        dataset: fo.Dataset,
+        label_field: str,
+        export_dir: str,
 ) -> None:
     label_type = dataset.get_field(label_field)
     if label_type is None:
@@ -36,12 +36,12 @@ def _export_patches(
 
 
 def to_patches(
-    dataset: str,
-    label_field: str,
-    to_name: str,
-    export_dir: str,
-    overwrite: bool = False,
-    **kwargs,
+        dataset: str,
+        label_field: str,
+        to_name: str,
+        export_dir: str,
+        overwrite: bool = False,
+        **kwargs,
 ) -> fo.Dataset:
     """Crop out patches from a dataset and create a new one
 
@@ -106,10 +106,10 @@ def prefix_label(dataset: str, label_field: str, dest_field: str, prefix: str):
 
 
 def merge_diff(
-    dataset: str,
-    image_dir: str,
-    tags: types.LIST_STR_STR = None,
-    recursive: bool = True,
+        dataset: str,
+        image_dir: str,
+        tags: types.LIST_STR_STR = None,
+        recursive: bool = True,
 ):
     """Merge new files into an existing dataset.
 
@@ -175,7 +175,7 @@ def exif_transpose(dataset: str, **kwargs):
 
 
 def map_labels(
-    dataset: str, from_field: str, to_field: str, label_mapping: dict, **kwargs
+        dataset: str, from_field: str, to_field: str, label_mapping: dict, **kwargs
 ) -> fo.DatasetView:
     """Create a new dataset field with mapped labels.
 
@@ -215,9 +215,11 @@ def from_labels(dataset: str, label_field: str, from_field: str, **kwargs):
     dataset = dataset.exists(label_field)
 
     assert dataset.has_sample_field(label_field), f"Dataset does not contain {label_field=}."
-    assert (doc_type := dataset.get_field(label_field).document_type) == fo.Detections, f"{label_field=} has to be of type Detections, got {doc_type=}."
+    assert (doc_type := dataset.get_field(
+        label_field).document_type) == fo.Detections, f"{label_field=} has to be of type Detections, got {doc_type=}."
     assert dataset.has_sample_field(from_field), f"Dataset does not contain {from_field=}."
-    assert (doc_type := dataset.get_field(from_field).document_type) == fo.Classification, f"{from_field=} has to be of type Detections, got {doc_type=}."
+    assert (doc_type := dataset.get_field(
+        from_field).document_type) == fo.Classification, f"{from_field=} has to be of type Detections, got {doc_type=}."
 
     for smp in tqdm(dataset.select_fields([label_field, from_field])):
         _update_labels(smp[label_field], smp[from_field].label)
@@ -250,8 +252,8 @@ def combine_datasets(dest_name: str, label_field: str, cfg: str, persistent: boo
         assert "label_field" in one and isinstance(one["label_field"], str)
 
         temp_name = f"{dest_name}_{one['name']}"
-        temp = load_fiftyone_dataset(one["name"], **one["filters"])\
-                                    .clone(name=temp_name, persistent=False)
+        temp = load_fiftyone_dataset(one["name"], **one["filters"]) \
+            .clone(name=temp_name, persistent=False)
         temp.clone_sample_field(one["label_field"], label_field)
         if "tag" in one:
             temp.tag_samples(one["tag"])
@@ -260,3 +262,27 @@ def combine_datasets(dest_name: str, label_field: str, cfg: str, persistent: boo
         fo.delete_dataset(temp_name)
 
     return dataset
+
+
+def fix_filepath(src: str, from_dir: str, to_dir: str) -> None:
+    """Replace from_dir part to to_dir in each sample's filepath in samples.json file.
+
+    Samples.json file is updated inplace.
+
+    Args:
+        src: sample.json file export for fiftyone.types.FiftyOneDataset
+        from_dir: relative directory to replace
+        to_dir: new relative directory
+    """
+    # TODO test this
+    src = Path(src)
+    assert src.exists() and src.suffix == ".json"
+    samples = read_json(src)
+
+    to_dir = Path(to_dir)
+    fix_path = lambda path: str(to_dir / Path(path).relative_to(from_dir))
+
+    for smp in samples["samples"]:
+        smp["filepath"] = fix_path(smp["filepath"])
+
+    write_json(samples, src)

@@ -1,3 +1,4 @@
+import json
 from configparser import ConfigParser
 from pathlib import Path
 from typing import Optional, Union
@@ -54,3 +55,14 @@ def read_yaml(path: str):
 def write_yaml(data: dict, path: str):
     with open(path, "w") as f:
         yaml.safe_dump(data, f)
+
+
+def read_json(file: str) -> list | dict:
+    with open(file) as f:
+        data = json.load(f)
+    return data
+
+
+def write_json(data: list | dict, file: str):
+    with open(file, "w") as f:
+        json.dump(data, f)
