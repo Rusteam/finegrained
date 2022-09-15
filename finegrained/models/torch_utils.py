@@ -4,6 +4,7 @@ from typing import Optional
 
 import torch
 import torchvision.transforms as T
+from pytorch_lightning.accelerators import MPSAccelerator, CUDAAccelerator
 
 from finegrained.utils import types
 
@@ -11,13 +12,23 @@ from finegrained.utils import types
 cuda_available = torch.cuda.is_available()
 
 
-def get_cuda_count() -> int:
+def get_device_count() -> int:
     """Get a count of gpus if cuda is available."""
-    return torch.cuda.device_count() if cuda_available else 0
+    if CUDAAccelerator.is_available():
+        return CUDAAccelerator.auto_device_count()
+    elif MPSAccelerator.is_available():
+        return MPSAccelerator.auto_device_count()
+    else:
+        return 1
 
 
 def get_device() -> torch.device:
-    return torch.device("cuda" if cuda_available else "cpu")
+    if CUDAAccelerator.is_available():
+        return torch.device("cuda")
+    elif MPSAccelerator.is_available():
+        return torch.device("mps")
+    else:
+        return torch.device("cpu")
 
 
 def get_default_batch_size() -> int:

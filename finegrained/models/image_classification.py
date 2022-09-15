@@ -77,13 +77,13 @@ class ImageClassification(FlashFiftyOneTask, TritonExporter):
         self.data = ImageClassificationData.from_fiftyone(
             train_dataset=dataset.match_tags(tags["train"]),
             val_dataset=dataset.match_tags(tags["val"]),
+            test_dataset=dataset.match_tags(tags["test"]) if "test" in tags else None,
             label_field=label_field,
             batch_size=kwargs.get("batch_size", 16),
             target_formatter=SingleLabelTargetFormatter(
                 labels=self.labels, num_classes=len(self.labels)
             ),
-            train_transform=get_transform(kwargs.get("train_transform")),
-            val_transform=get_transform(kwargs.get("val_transform")),
+            transform=get_transform(kwargs.get("train_transform")),
             transform_kwargs=kwargs.get("transform_kwargs"),
         )
 

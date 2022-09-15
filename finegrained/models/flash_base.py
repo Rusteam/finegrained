@@ -11,7 +11,7 @@ from tqdm import tqdm
 import fiftyone as fo
 
 from finegrained.utils.dataset import load_fiftyone_dataset
-from finegrained.models.torch_utils import get_cuda_count
+from finegrained.models.torch_utils import get_device, get_device_count
 from finegrained.utils.os_utils import read_yaml
 
 
@@ -150,7 +150,8 @@ class FlashFiftyOneTask:
             max_epochs=epochs,
             limit_train_batches=kwargs.get("limit_train_batches"),
             limit_val_batches=kwargs.get("limit_val_batches"),
-            gpus=get_cuda_count(),
+            accelerator=get_device().type,
+            devices=get_device_count()
         )
 
         trainer.finetune(
@@ -162,7 +163,7 @@ class FlashFiftyOneTask:
         trainer.save_checkpoint(kwargs.get("save_checkpoint", "model.pt"))
 
     def _predict(self):
-        trainer = Trainer(gpus=get_cuda_count())
+        trainer = Trainer(accelerator=get_device().type, devices=get_device_count())
         predictions = trainer.predict(
             self.model,
             datamodule=self.data,

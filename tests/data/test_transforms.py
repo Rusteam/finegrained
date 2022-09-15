@@ -18,13 +18,15 @@ def temp_dataset():
         .take(100)
         .clone("test_transforms_temp")
     )
-    if len(dataset.exists("resnet50")) < len(dataset):
-        model = foz.load_zoo_model("resnet50")
-        dataset.exists("resnet50", False).apply(
-            model, label_field="resnet50", batch_size=4
+    model_name = "resnet18-imagenet-torch"
+    if len(dataset.exists(model_name)) < len(dataset):
+        model = foz.load_zoo_model(model_name)
+        dataset.exists(model_name, False).apply_model(
+            model, label_field=model_name, batch_size=4
         )
     yield dataset
-    fo.delete_dataset(dataset.name)
+    if fo.dataset_exists(dataset.name):
+        fo.delete_dataset(dataset.name)
 
 
 @pytest.fixture(scope="function")
@@ -33,11 +35,12 @@ def to_patches_conf(tmp_path):
     name = "test_to_patches_temp"
     yield str(path), name
     shutil.rmtree(path)
-    fo.delete_dataset(name)
+    if fo.dataset_exists(name):
+        fo.delete_dataset(name)
 
 
 @pytest.mark.parametrize(
-    "label_field", ["predictions", ("predictions", "resnet50")]
+    "label_field", ["predictions", ("predictions", "resnet18-imagenet-torch")]
 )
 def test_to_patches(to_patches_conf, temp_dataset, label_field):
     export_dir, name = to_patches_conf
@@ -57,11 +60,12 @@ def test_to_patches(to_patches_conf, temp_dataset, label_field):
 
 
 def test_tag_samples(temp_dataset):
-    tag.tag_samples(temp_dataset.name, "new_tag")
+    tag_name = "new_tag"
+    tag_counts = tag.tag_samples(temp_dataset.name, tag_name)
 
-    for tag in ["new_tag", "two", "four"]:
-        tagged = temp_dataset.match_tags(tag)
-        assert len(tagged) == len(temp_dataset)
+    assert tag_name in tag_counts
+    assert tag_counts[tag_name] == len(temp_dataset)
+    assert "not_existing_tag" not in tag_counts
 
 
 def test_delete_field(temp_dataset):

@@ -37,7 +37,7 @@ def _export_patches(
 
 def to_patches(
         dataset: str,
-        label_field: str,
+        label_field: str | list[str],
         to_name: str,
         export_dir: str,
         overwrite: bool = False,
@@ -47,7 +47,7 @@ def to_patches(
 
     Args:
         dataset: a fiftyone dataset with detections
-        label_field: detections label field
+        label_field: label field(s) with detection, classification or polylines
         to_name: a new dataset name for patches
         export_dir: where to save crops
         overwrite: if True and that name already exists, delete it
