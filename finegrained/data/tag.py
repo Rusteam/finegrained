@@ -1,5 +1,7 @@
 """Tag or untag samples with specific filters or condition
 """
+from typing import Optional
+
 from fiftyone import ViewField as F
 from fiftyone.utils import random as four
 from sklearn.model_selection import train_test_split
@@ -85,12 +87,14 @@ def split_classes(
     return dataset.count_sample_tags()
 
 
-def tag_vertical(dataset: str, tag: str = "vertical", **kwargs) -> dict:
-    """Add a tag to samples where height is larger than width
+def tag_alignment(dataset: str, vertical: bool = True, tag: Optional[str] = None, **kwargs) -> dict:
+    """Add a vertical/horizontal tag each sample.
 
     Args:
         dataset: fiftyone dataset name
-        tag: a tag to add
+        vertical: if True, vertical images are tagged.
+            If False, horizontal images are tagged.
+        tag: overwrite default 'vertical' or 'horizontal' tag.
         **kwargs: dataset filter kwargs
 
     Returns:
@@ -98,6 +102,11 @@ def tag_vertical(dataset: str, tag: str = "vertical", **kwargs) -> dict:
     """
     dataset = load_fiftyone_dataset(dataset, **kwargs)
     dataset.compute_metadata()
-    vertical_view = dataset.match(F("metadata.height") > F("metadata.width"))
-    vertical_view.tag_samples(tag)
-    return vertical_view.count_sample_tags()
+    if vertical:
+        tag = "vertical" if tag is None else tag
+        tag_view = dataset.match(F("metadata.height") > F("metadata.width"))
+    else:
+        tag = "horizontal" if tag is None else tag
+        tag_view = dataset.match(F("metadata.width") >= F("metadata.height"))
+    tag_view.tag_samples(tag)
+    return tag_view.count_sample_tags()

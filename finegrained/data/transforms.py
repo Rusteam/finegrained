@@ -1,9 +1,11 @@
 """Data transforms on top of fiftyone datasets.
 """
+import shutil
 from pathlib import Path
+from typing import Optional
 
 import fiftyone as fo
-from PIL import Image, ImageOps
+from PIL import Image, ImageOps, UnidentifiedImageError
 from fiftyone.types import ImageClassificationDirectoryTree
 from tqdm import tqdm
 
@@ -14,9 +16,10 @@ from ..utils.os_utils import read_yaml, read_json, write_json
 
 
 def _export_patches(
-        dataset: fo.Dataset,
-        label_field: str,
-        export_dir: str,
+    dataset: fo.Dataset,
+    label_field: str,
+    export_dir: Path,
+    splits: Optional[list[str]] = None,
 ) -> None:
     label_type = dataset.get_field(label_field)
     if label_type is None:
@@ -28,22 +31,31 @@ def _export_patches(
         patches = dataset.to_patches(label_field)
     else:
         raise ValueError(f"{label_type=} cannot be exported as patches")
-    patches.export(
-        export_dir,
-        dataset_type=ImageClassificationDirectoryTree,
-        label_field=label_field,
-    )
+    if splits:
+        for tag in splits:
+            patches.match_tags(tag).export(
+                str(export_dir / tag),
+                dataset_type=ImageClassificationDirectoryTree,
+                label_field=label_field,
+            )
+    else:
+        patches.export(
+            str(export_dir),
+            dataset_type=ImageClassificationDirectoryTree,
+            label_field=label_field,
+        )
 
 
 def to_patches(
-        dataset: str,
-        label_field: str | list[str],
-        to_name: str,
-        export_dir: str,
-        overwrite: bool = False,
-        **kwargs,
+    dataset: str,
+    label_field: str | list[str],
+    to_name: str,
+    export_dir: str,
+    overwrite: bool = False,
+    splits: Optional[list[str]] = None,
+    **kwargs,
 ) -> fo.Dataset:
-    """Crop out patches from a dataset and create a new one
+    """Crop out patches from a dataset and create a new one.
 
     Args:
         dataset: a fiftyone dataset with detections
@@ -51,18 +63,60 @@ def to_patches(
         to_name: a new dataset name for patches
         export_dir: where to save crops
         overwrite: if True and that name already exists, delete it
+        splits: if provided, these tags will be used to split patches into subsets
         **kwargs: dataset filters
 
     Returns:
         fiftyone dataset object
     """
+    export_dir = Path(export_dir)
+
+    # prompt overwriting if dataset or folder exist
+    if not overwrite:
+        if fo.dataset_exists(to_name):
+            raise ValueError(
+                f"{to_name=} dataset already exists. Use --overwrite or delete it."
+            )
+        if export_dir.exists():
+            raise ValueError(
+                f"{str(export_dir)=} already exists. User --overwrite or delete it manually"
+            )
+    else:
+        if export_dir.exists():
+            shutil.rmtree(export_dir)
+
     dataset = load_fiftyone_dataset(dataset, **kwargs)
     label_field = parse_list_str(label_field)
+
+    # make sure splits are present if given
+    if splits:
+        splits = parse_list_str(splits)
+        tag_counts = dataset.count_sample_tags()
+        assert all(
+            [s in tag_counts for s in splits]
+        ), f"{dataset.name=} does not contain all {splits=}"
+
+    # export each label field
     for field in label_field:
-        _export_patches(dataset, field, export_dir)
+        assert dataset.has_sample_field(
+            field
+        ), f"{dataset.name=} does not contain {field=}"
+        _export_patches(dataset, field, export_dir, splits)
+
+    # import all together, tag if needed
     new = create_fiftyone_dataset(
-        to_name, export_dir, ImageClassificationDirectoryTree, overwrite
+        name=to_name,
+        src=export_dir if splits is None else None,
+        dataset_type=ImageClassificationDirectoryTree,
+        overwrite=overwrite,
     )
+    if splits:
+        for tag in splits:
+            new.add_dir(
+                dataset_dir=str(export_dir / tag),
+                dataset_type=ImageClassificationDirectoryTree,
+                tags=tag,
+            )
     return new
 
 
@@ -106,10 +160,10 @@ def prefix_label(dataset: str, label_field: str, dest_field: str, prefix: str):
 
 
 def merge_diff(
-        dataset: str,
-        image_dir: str,
-        tags: types.LIST_STR_STR = None,
-        recursive: bool = True,
+    dataset: str,
+    image_dir: str,
+    tags: types.LIST_STR_STR = None,
+    recursive: bool = True,
 ):
     """Merge new files into an existing dataset.
 
@@ -169,13 +223,16 @@ def exif_transpose(dataset: str, **kwargs):
     """
     dataset = load_fiftyone_dataset(dataset, **kwargs)
     for smp in tqdm(dataset.select_fields("filepath"), desc="transposing"):
-        orig = Image.open(smp.filepath)
-        transposed = ImageOps.exif_transpose(orig)
-        transposed.save(smp.filepath)
+        try:
+            orig = Image.open(smp.filepath)
+            transposed = ImageOps.exif_transpose(orig)
+            transposed.save(smp.filepath)
+        except UnidentifiedImageError as e:
+            print(e, 'at', smp.filepath)
 
 
 def map_labels(
-        dataset: str, from_field: str, to_field: str, label_mapping: dict, **kwargs
+    dataset: str, from_field: str, to_field: str, label_mapping: dict, **kwargs
 ) -> fo.DatasetView:
     """Create a new dataset field with mapped labels.
 
@@ -214,19 +271,31 @@ def from_labels(dataset: str, label_field: str, from_field: str, **kwargs):
     dataset = load_fiftyone_dataset(dataset, **kwargs)
     dataset = dataset.exists(label_field)
 
-    assert dataset.has_sample_field(label_field), f"Dataset does not contain {label_field=}."
-    assert (doc_type := dataset.get_field(
-        label_field).document_type) == fo.Detections, f"{label_field=} has to be of type Detections, got {doc_type=}."
-    assert dataset.has_sample_field(from_field), f"Dataset does not contain {from_field=}."
-    assert (doc_type := dataset.get_field(
-        from_field).document_type) == fo.Classification, f"{from_field=} has to be of type Detections, got {doc_type=}."
+    assert dataset.has_sample_field(
+        label_field
+    ), f"Dataset does not contain {label_field=}."
+    assert (
+        doc_type := dataset.get_field(label_field).document_type
+    ) == fo.Detections, (
+        f"{label_field=} has to be of type Detections, got {doc_type=}."
+    )
+    assert dataset.has_sample_field(
+        from_field
+    ), f"Dataset does not contain {from_field=}."
+    assert (
+        doc_type := dataset.get_field(from_field).document_type
+    ) == fo.Classification, (
+        f"{from_field=} has to be of type Detections, got {doc_type=}."
+    )
 
     for smp in tqdm(dataset.select_fields([label_field, from_field])):
         _update_labels(smp[label_field], smp[from_field].label)
         smp.save()
 
 
-def combine_datasets(dest_name: str, label_field: str, cfg: str, persistent: bool = True):
+def combine_datasets(
+    dest_name: str, label_field: str, cfg: str, persistent: bool = True
+):
     """Create a new dataset by adding samples from multiple datasets.
 
     List of datasets and filters are specified in a yaml config file.
@@ -242,21 +311,26 @@ def combine_datasets(dest_name: str, label_field: str, cfg: str, persistent: boo
         a dataset instance
     """
     cfg = read_yaml(cfg)
-    assert "datasets" in cfg and isinstance(dataset_cfg := cfg["datasets"], list)
+    assert "datasets" in cfg and isinstance(
+        dataset_cfg := cfg["datasets"], list
+    )
     assert len(dataset_cfg) > 0
 
-    dataset = create_fiftyone_dataset(dest_name, src=None, persistent=persistent)
+    dataset = create_fiftyone_dataset(
+        dest_name, src=None, persistent=persistent
+    )
     for one in dataset_cfg:
         assert "name" in one and isinstance(one["name"], str)
         assert "filters" in one and isinstance(one["filters"], dict)
         assert "label_field" in one and isinstance(one["label_field"], str)
 
         temp_name = f"{dest_name}_{one['name']}"
-        temp = load_fiftyone_dataset(one["name"], **one["filters"]) \
-            .clone(name=temp_name, persistent=False)
+        temp = load_fiftyone_dataset(one["name"], **one["filters"]).clone(
+            name=temp_name, persistent=False
+        )
         temp.clone_sample_field(one["label_field"], label_field)
-        if "tag" in one:
-            temp.tag_samples(one["tag"])
+        if "tags" in one:
+            temp.tag_samples(one["tags"])
 
         dataset.add_samples(temp.select_fields([label_field, "tags"]))
         fo.delete_dataset(temp_name)

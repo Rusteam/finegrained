@@ -5,6 +5,7 @@ import pytest
 import fiftyone as fo
 import fiftyone.zoo as foz
 import fiftyone.types as fot
+import fiftyone.utils.random as four
 
 from finegrained.data import transforms, tag
 from finegrained.utils.dataset import get_unique_labels
@@ -40,15 +41,25 @@ def to_patches_conf(tmp_path):
 
 
 @pytest.mark.parametrize(
-    "label_field", ["predictions", ("predictions", "resnet18-imagenet-torch")]
+    "label_field,splits",
+    [
+        ("predictions", None),
+        (("predictions", "resnet18-imagenet-torch"), None),
+        ("predictions", ["train_subset_del", "test_subset_del"]),
+    ],
 )
-def test_to_patches(to_patches_conf, temp_dataset, label_field):
+def test_to_patches(to_patches_conf, temp_dataset, label_field, splits):
     export_dir, name = to_patches_conf
+    if splits:
+        split_fracs = {s: 1 / len(splits) for s in splits}
+        four.random_split(temp_dataset, split_fracs)
+
     params = dict(
         dataset=temp_dataset.name,
         label_field=label_field,
         to_name=name,
         export_dir=export_dir,
+        splits=splits,
         overwrite=False,
     )
     new = transforms.to_patches(**params)
@@ -57,6 +68,10 @@ def test_to_patches(to_patches_conf, temp_dataset, label_field):
     existing_labels = get_unique_labels(temp_dataset, label_field)
 
     assert len(set(new_labels).difference(existing_labels)) == 0
+
+    tag_counts = new.count_sample_tags()
+    if splits:
+        assert all([s in tag_counts for s in splits])
 
 
 def test_tag_samples(temp_dataset):
@@ -103,11 +118,13 @@ def test_prefix_label(temp_dataset):
         assert smp["with_prefix"].label.startswith("new")
 
 
-def test_is_vertical(temp_dataset):
-    tag_counts = tag.tag_vertical(temp_dataset.name, tag="vert")
+@pytest.mark.parametrize("vertical", [True, False])
+def test_alignment(temp_dataset, vertical):
+    tag_counts = tag.tag_alignment(temp_dataset.name, vertical=vertical)
 
-    assert "vert" in tag_counts
-    assert tag_counts["vert"] > 0
+    aligment_tag = "vertical" if vertical else "horizontal"
+    assert aligment_tag in tag_counts
+    assert tag_counts[aligment_tag] > 0
 
 
 def test_split_classes(temp_dataset):
@@ -203,12 +220,18 @@ def test_delete_samples(temp_dataset, tmp_path):
     assert "zebra" not in values
 
 
-@pytest.mark.parametrize("to_field,mapping", [
-    ("new_labels", dict(
-        carrot="veg", car="transport", boat="transport", broccoli="veg"
-    )),
-    ("same_field", {}),
-])
+@pytest.mark.parametrize(
+    "to_field,mapping",
+    [
+        (
+            "new_labels",
+            dict(
+                carrot="veg", car="transport", boat="transport", broccoli="veg"
+            ),
+        ),
+        ("same_field", {}),
+    ],
+)
 def test_map_labels(temp_dataset, to_field, mapping):
     transforms.map_labels(
         dataset=temp_dataset.name,
@@ -239,13 +262,11 @@ def test_from_labels(temp_dataset):
         dataset=temp_dataset.name,
         from_field="predictions",
         to_field=new_field,
-        label_mapping=None
+        label_mapping=None,
     )
 
     transforms.from_labels(
-        dataset=temp_dataset.name,
-        label_field=new_field,
-        from_field="resnet50"
+        dataset=temp_dataset.name, label_field=new_field, from_field="resnet50"
     )
 
     expected_labels = get_unique_labels(temp_dataset, "resnet50")
@@ -254,34 +275,42 @@ def test_from_labels(temp_dataset):
     assert all([l in expected_labels for l in actual_labels])
 
 
-
 @pytest.fixture(scope="function")
 def combine_cfg_path(tmp_path):
     cfg = dict(
         datasets=[
             dict(
                 name="quickstart",
-                filters=dict(
-                    include_tags="test"
-                ),
+                filters=dict(include_tags="test"),
                 label_field="ground_truth",
-                tag="test"
+                tags="test",
             ),
             dict(
                 name="quickstart",
                 filters=dict(
-                    include_labels=dict(ground_truth=["broccoli", "cake", "car", "cell phone", "chair", "clock"])
+                    include_labels=dict(
+                        ground_truth=[
+                            "broccoli",
+                            "cake",
+                            "car",
+                            "cell phone",
+                            "chair",
+                            "clock",
+                        ]
+                    )
                 ),
                 label_field="ground_truth",
-                tag="train",
+                tags=["train", "quick"],
             ),
             dict(
                 name="quickstart",
                 filters=dict(
-                    include_labels=dict(ground_truth=["bear", "bed", "banana"]),
+                    include_labels=dict(
+                        ground_truth=["bear", "bed", "banana"]
+                    ),
                 ),
                 label_field="ground_truth",
-                tag="val",
+                tags=["val", "quick"],
             ),
         ]
     )
@@ -293,10 +322,12 @@ def combine_cfg_path(tmp_path):
 def test_combine_datasets(combine_cfg_path):
     new_name = "combo_test_delete"
     label_field = "combo_field"
-    dataset = transforms.combine_datasets(new_name, label_field,
-                                          combine_cfg_path, persistent=False)
+    dataset = transforms.combine_datasets(
+        new_name, label_field, combine_cfg_path, persistent=False
+    )
 
     tags = dataset.count_sample_tags()
-    assert all([x in tags for x in ["train", "val", "test"]])
+    assert all([x in tags for x in ["train", "val", "test", "quick"]])
+    assert tags["train"] < tags["quick"] < len(dataset)
 
     assert dataset.has_sample_field(label_field)
