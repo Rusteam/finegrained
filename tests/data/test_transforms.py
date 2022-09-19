@@ -6,6 +6,7 @@ import fiftyone as fo
 import fiftyone.zoo as foz
 import fiftyone.types as fot
 import fiftyone.utils.random as four
+from PIL import Image
 
 from finegrained.data import transforms, tag
 from finegrained.utils.dataset import get_unique_labels
@@ -331,3 +332,26 @@ def test_combine_datasets(combine_cfg_path):
     assert tags["train"] < tags["quick"] < len(dataset)
 
     assert dataset.has_sample_field(label_field)
+
+
+def test_transpose_images(temp_dataset, tmp_path):
+    dataset_dir = str(tmp_path / "transpose")
+    dataset_type = fo.types.ImageClassificationDirectoryTree
+    temp_dataset.take(2).export(
+        export_dir=dataset_dir,
+        dataset_type=dataset_type,
+        label_field="ground_truth",
+    )
+
+    new = fo.Dataset.from_dir(
+        dataset_dir=dataset_dir, dataset_type=dataset_type
+    )
+    new.persistent = False
+
+    sizes = [Image.open(p).size for p in new.values("filepath")]
+    transforms.transpose_images(new.name, label_conf=0.5)
+
+    for p, size in zip(new.values("filepath"), sizes):
+        new_size = Image.open(p).size
+        assert new_size[1] == size[0]
+        assert new_size[0] == size[1]

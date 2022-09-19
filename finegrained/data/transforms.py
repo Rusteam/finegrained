@@ -16,10 +16,10 @@ from ..utils.os_utils import read_yaml, read_json, write_json
 
 
 def _export_patches(
-    dataset: fo.Dataset,
-    label_field: str,
-    export_dir: Path,
-    splits: Optional[list[str]] = None,
+        dataset: fo.Dataset,
+        label_field: str,
+        export_dir: Path,
+        splits: Optional[list[str]] = None,
 ) -> None:
     label_type = dataset.get_field(label_field)
     if label_type is None:
@@ -47,13 +47,13 @@ def _export_patches(
 
 
 def to_patches(
-    dataset: str,
-    label_field: str | list[str],
-    to_name: str,
-    export_dir: str,
-    overwrite: bool = False,
-    splits: Optional[list[str]] = None,
-    **kwargs,
+        dataset: str,
+        label_field: str | list[str],
+        to_name: str,
+        export_dir: str,
+        overwrite: bool = False,
+        splits: Optional[list[str]] = None,
+        **kwargs,
 ) -> fo.Dataset:
     """Crop out patches from a dataset and create a new one.
 
@@ -160,10 +160,10 @@ def prefix_label(dataset: str, label_field: str, dest_field: str, prefix: str):
 
 
 def merge_diff(
-    dataset: str,
-    image_dir: str,
-    tags: types.LIST_STR_STR = None,
-    recursive: bool = True,
+        dataset: str,
+        image_dir: str,
+        tags: types.LIST_STR_STR = None,
+        recursive: bool = True,
 ):
     """Merge new files into an existing dataset.
 
@@ -228,11 +228,16 @@ def exif_transpose(dataset: str, **kwargs):
             transposed = ImageOps.exif_transpose(orig)
             transposed.save(smp.filepath)
         except UnidentifiedImageError as e:
-            print(e, 'at', smp.filepath)
+            print(e, "at", smp.filepath)
 
 
 def map_labels(
-    dataset: str, from_field: str, to_field: str, label_mapping: dict, **kwargs
+        dataset: str,
+        from_field: str,
+        to_field: str,
+        label_mapping: Optional[dict] = None,
+        overwrite: bool = False,
+        **kwargs,
 ) -> fo.DatasetView:
     """Create a new dataset field with mapped labels.
 
@@ -241,12 +246,19 @@ def map_labels(
         from_field: source label field
         to_field: a new label field
         label_mapping: label mapping (use {}/None for creating a field copy)
+        overwrite: if to_field already exists, then overwrite it
         **kwargs: dataset loading kwargs
 
     Returns:
         dataset view
     """
     dataset = load_fiftyone_dataset(dataset, **kwargs)
+
+    if overwrite and dataset.has_sample_field(to_field):
+        delete_field(dataset.dataset_name, to_field)
+    elif not overwrite and dataset.has_sample_field(to_field):
+        raise ValueError(f"{to_field=} already exists")
+
     dataset.clone_sample_field(from_field, to_field)
     if bool(label_mapping):
         dataset = dataset.map_labels(to_field, label_mapping)
@@ -275,16 +287,16 @@ def from_labels(dataset: str, label_field: str, from_field: str, **kwargs):
         label_field
     ), f"Dataset does not contain {label_field=}."
     assert (
-        doc_type := dataset.get_field(label_field).document_type
-    ) == fo.Detections, (
+               doc_type := dataset.get_field(label_field).document_type
+           ) == fo.Detections, (
         f"{label_field=} has to be of type Detections, got {doc_type=}."
     )
     assert dataset.has_sample_field(
         from_field
     ), f"Dataset does not contain {from_field=}."
     assert (
-        doc_type := dataset.get_field(from_field).document_type
-    ) == fo.Classification, (
+               doc_type := dataset.get_field(from_field).document_type
+           ) == fo.Classification, (
         f"{from_field=} has to be of type Detections, got {doc_type=}."
     )
 
@@ -294,7 +306,7 @@ def from_labels(dataset: str, label_field: str, from_field: str, **kwargs):
 
 
 def combine_datasets(
-    dest_name: str, label_field: str, cfg: str, persistent: bool = True
+        dest_name: str, label_field: str, cfg: str, persistent: bool = True, overwrite: bool = False
 ):
     """Create a new dataset by adding samples from multiple datasets.
 
@@ -306,6 +318,7 @@ def combine_datasets(
         label_field: a new label field
         cfg: path to yaml config
         persistent: whether to persist destination dataset (False for testing)
+        overwrite: if dataset exists, overwrite it
 
     Returns:
         a dataset instance
@@ -317,7 +330,7 @@ def combine_datasets(
     assert len(dataset_cfg) > 0
 
     dataset = create_fiftyone_dataset(
-        dest_name, src=None, persistent=persistent
+        dest_name, src=None, persistent=persistent, overwrite=overwrite
     )
     for one in dataset_cfg:
         assert "name" in one and isinstance(one["name"], str)
@@ -360,3 +373,23 @@ def fix_filepath(src: str, from_dir: str, to_dir: str) -> None:
         smp["filepath"] = fix_path(smp["filepath"])
 
     write_json(samples, src)
+
+
+def transpose_images(dataset: str, **kwargs) -> fo.DatasetView:
+    """Rotate images 90 degrees.
+
+    Args:
+        dataset: fiftyone dataset name
+        **kwargs: dataset loading filters
+
+    Returns:
+        a dataset view instance
+    """
+    assert len(kwargs) > 0, "Danger: provide dataset filters"
+
+    dataset = load_fiftyone_dataset(dataset, **kwargs)
+
+    for smp in tqdm(dataset.select_fields("filepath"), desc="transposing"):
+        Image.open(smp.filepath).transpose(Image.ROTATE_90).save(smp.filepath)
+
+    return dataset

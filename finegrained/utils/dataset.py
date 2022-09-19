@@ -16,7 +16,7 @@ def load_fiftyone_dataset(
     label_conf: float = 0.0,
     fields_exist: LIST_STR = None,
     not_exist: LIST_STR = None,
-) -> fo.Dataset:
+) -> fo.DatasetView:
     """Load a dataset and apply view filters
 
     Args:
@@ -26,6 +26,7 @@ def load_fiftyone_dataset(
         exclude_tags: exclude samples that match these sample tags
         max_samples: randomly select this number of samples if specified
         label_conf: if 'include_labels' specified, apply confidence threshold
+            (only works when include_labels is specified)
         fields_exist: keep samples that contain these fields
         not_exist: keep samples that do Not contain these fields
 
@@ -42,9 +43,9 @@ def load_fiftyone_dataset(
     if bool(include_labels):
         for field, values in include_labels.items():
             filter_fn = F("label").is_in(parse_list_str(values))
-            if label_conf > 0:
-                filter_fn = filter_fn & F("confidence") >= label_conf
             dataset = dataset.filter_labels(field, filter_fn)
+            if label_conf > 0:
+                dataset = dataset.filter_labels(field, F("confidence") >= label_conf)
     if bool(fields_exist):
         for field in parse_list_str(fields_exist):
             dataset = dataset.exists(field)
