@@ -377,3 +377,19 @@ def test_transpose_images(temp_dataset, tmp_path):
         new_size = Image.open(p).size
         assert new_size[1] == size[0]
         assert new_size[0] == size[1]
+
+@pytest.mark.parametrize("avg_size", [False, True])
+def test_compute_area(temp_dataset, avg_size):
+    field = temp_dataset.make_unique_field_name()
+    min_area, max_area = transforms.compute_area(
+        dataset=temp_dataset.name,
+        field=field,
+        average_size=avg_size
+    )
+
+    assert max_area > min_area
+
+    if avg_size:
+        assert max_area < 1000
+    else:
+        assert max_area > 1000

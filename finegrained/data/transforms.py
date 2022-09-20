@@ -5,21 +5,22 @@ from pathlib import Path
 from typing import Optional
 
 import fiftyone as fo
-from PIL import Image, ImageOps, UnidentifiedImageError
+from fiftyone import ViewField as F
 from fiftyone.types import ImageClassificationDirectoryTree
+from PIL import Image, ImageOps, UnidentifiedImageError
 from tqdm import tqdm
 
 from ..utils import types
-from ..utils.dataset import load_fiftyone_dataset, create_fiftyone_dataset
+from ..utils.dataset import load_fiftyone_dataset, create_fiftyone_dataset, get_unique_labels
 from ..utils.general import parse_list_str
 from ..utils.os_utils import read_yaml, read_json, write_json
 
 
 def _export_patches(
-        dataset: fo.Dataset,
-        label_field: str,
-        export_dir: Path,
-        splits: Optional[list[str]] = None,
+    dataset: fo.Dataset,
+    label_field: str,
+    export_dir: Path,
+    splits: Optional[list[str]] = None,
 ) -> None:
     label_type = dataset.get_field(label_field)
     if label_type is None:
@@ -47,13 +48,13 @@ def _export_patches(
 
 
 def to_patches(
-        dataset: str,
-        label_field: str | list[str],
-        to_name: str,
-        export_dir: str,
-        overwrite: bool = False,
-        splits: Optional[list[str]] = None,
-        **kwargs,
+    dataset: str,
+    label_field: str | list[str],
+    to_name: str,
+    export_dir: str,
+    overwrite: bool = False,
+    splits: Optional[list[str]] = None,
+    **kwargs,
 ) -> fo.Dataset:
     """Crop out patches from a dataset and create a new one.
 
@@ -160,10 +161,10 @@ def prefix_label(dataset: str, label_field: str, dest_field: str, prefix: str):
 
 
 def merge_diff(
-        dataset: str,
-        image_dir: str,
-        tags: types.LIST_STR_STR = None,
-        recursive: bool = True,
+    dataset: str,
+    image_dir: str,
+    tags: types.LIST_STR_STR = None,
+    recursive: bool = True,
 ):
     """Merge new files into an existing dataset.
 
@@ -232,12 +233,12 @@ def exif_transpose(dataset: str, **kwargs):
 
 
 def map_labels(
-        dataset: str,
-        from_field: str,
-        to_field: str,
-        label_mapping: Optional[dict] = None,
-        overwrite: bool = False,
-        **kwargs,
+    dataset: str,
+    from_field: str,
+    to_field: str,
+    label_mapping: Optional[dict] = None,
+    overwrite: bool = False,
+    **kwargs,
 ) -> fo.DatasetView:
     """Create a new dataset field with mapped labels.
 
@@ -287,16 +288,16 @@ def from_labels(dataset: str, label_field: str, from_field: str, **kwargs):
         label_field
     ), f"Dataset does not contain {label_field=}."
     assert (
-               doc_type := dataset.get_field(label_field).document_type
-           ) == fo.Detections, (
+        doc_type := dataset.get_field(label_field).document_type
+    ) == fo.Detections, (
         f"{label_field=} has to be of type Detections, got {doc_type=}."
     )
     assert dataset.has_sample_field(
         from_field
     ), f"Dataset does not contain {from_field=}."
     assert (
-               doc_type := dataset.get_field(from_field).document_type
-           ) == fo.Classification, (
+        doc_type := dataset.get_field(from_field).document_type
+    ) == fo.Classification, (
         f"{from_field=} has to be of type Detections, got {doc_type=}."
     )
 
@@ -305,7 +306,9 @@ def from_labels(dataset: str, label_field: str, from_field: str, **kwargs):
         smp.save()
 
 
-def from_label_tag(dataset: str, label_field: str, label_tag: str, **kwargs) -> dict:
+def from_label_tag(
+    dataset: str, label_field: str, label_tag: str, **kwargs
+) -> dict:
     """Update a label_field label with its label_tag.
 
     Args:
@@ -320,7 +323,9 @@ def from_label_tag(dataset: str, label_field: str, label_tag: str, **kwargs) -> 
     kwargs = kwargs | {"label_tags": label_tag}
     dataset = load_fiftyone_dataset(dataset, **kwargs)
 
-    for smp in tqdm(dataset.select_fields(label_field), desc="updating samples"):
+    for smp in tqdm(
+        dataset.select_fields(label_field), desc="updating samples"
+    ):
         for det in smp[label_field].detections:
             if label_tag in det.tags:
                 det.label = label_tag
@@ -330,7 +335,11 @@ def from_label_tag(dataset: str, label_field: str, label_tag: str, **kwargs) -> 
 
 
 def combine_datasets(
-        dest_name: str, label_field: str, cfg: str, persistent: bool = True, overwrite: bool = False
+    dest_name: str,
+    label_field: str,
+    cfg: str,
+    persistent: bool = True,
+    overwrite: bool = False,
 ):
     """Create a new dataset by adding samples from multiple datasets.
 
@@ -417,3 +426,62 @@ def transpose_images(dataset: str, **kwargs) -> fo.DatasetView:
         Image.open(smp.filepath).transpose(Image.ROTATE_90).save(smp.filepath)
 
     return dataset
+
+
+def compute_area(
+    dataset: str,
+    field: str = "area",
+    average_size: bool = False,
+    overwrite_metadata: bool = False,
+    overwrite: bool = False,
+    **kwargs,
+) -> tuple[int, int]:
+    """Calculate area of an image based on metadata
+
+    Args:
+        dataset: fiftyone dataset name
+        field: field where to assign area values
+        average_size: if True, calculate (width + height)/2 instead
+        overwrite_metadata: whether to overwrite metadata
+        overwrite: delete field if already exists
+        **kwargs: dataset loading filters
+
+    Returns:
+        area bounds
+    """
+    dataset = load_fiftyone_dataset(dataset, **kwargs)
+    if dataset.has_sample_field(field):
+        if overwrite:
+            delete_field(dataset.name, field)
+        else:
+            raise ValueError(f"{field=} already exists.")
+
+    dataset.compute_metadata(overwrite=overwrite_metadata)
+    for smp in dataset.select_fields("metadata"):
+        val = (smp.metadata.width + smp.metadata.height) / 2 if average_size else smp.metadata.width * smp.metadata.height
+        smp[field] = val
+        smp.save()
+
+    return dataset.bounds(field)
+
+
+def label_diff(dataset: str, label_field: str, tags_left: types.LIST_STR_STR, tags_right: types.LIST_STR_STR):
+    """Compute difference between two sets of labels.
+
+    Args:
+        dataset: fiftyone dataset name
+        label_field: field with labels
+        tags_left: list of tags for base list of labels
+        tags_right: list of tags for intersection comparison
+    """
+    # TODO test this
+    dataset = load_fiftyone_dataset(dataset)
+    assert dataset.has_sample_field(label_field)
+    assert len(tags_left) > 0
+    assert len(tags_right) > 0
+
+    left_labels = get_unique_labels(dataset.match_tags(tags_left), label_field)
+    right_labels = get_unique_labels(dataset.match_tags(tags_right), label_field)
+
+    diff = set(left_labels).difference(right_labels)
+    return list(diff)

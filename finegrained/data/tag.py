@@ -6,6 +6,7 @@ from fiftyone import ViewField as F
 from fiftyone.utils import random as four
 from sklearn.model_selection import train_test_split
 
+from finegrained.data.transforms import label_diff
 from finegrained.utils.dataset import (
     load_fiftyone_dataset,
 )
@@ -73,8 +74,9 @@ def split_classes(
     """
     dataset = load_fiftyone_dataset(dataset)
     label_counts = dataset.count_values(f"{label_field}.label")
-    labels = list(filter(lambda x: label_counts[x] >= min_samples,
-                         label_counts))
+    labels = list(
+        filter(lambda x: label_counts[x] >= min_samples, label_counts)
+    )
     train_labels, val_labels = train_test_split(
         labels, test_size=val_size, train_size=train_size, shuffle=True
     )
@@ -87,7 +89,9 @@ def split_classes(
     return dataset.count_sample_tags()
 
 
-def tag_alignment(dataset: str, vertical: bool = True, tag: Optional[str] = None, **kwargs) -> dict:
+def tag_alignment(
+    dataset: str, vertical: bool = True, tag: Optional[str] = None, **kwargs
+) -> dict:
     """Add a vertical/horizontal tag each sample.
 
     Args:
@@ -110,3 +114,36 @@ def tag_alignment(dataset: str, vertical: bool = True, tag: Optional[str] = None
         tag_view = dataset.match(F("metadata.width") >= F("metadata.height"))
     tag_view.tag_samples(tag)
     return tag_view.count_sample_tags()
+
+
+def retag_missing_labels(
+    dataset: str,
+    label_field: str,
+    from_tags: types.LIST_STR_STR,
+    to_tags: types.LIST_STR_STR,
+) -> dict:
+    """Remove from_tags and add to_tags for labels that are present in
+        from_tags but absent in to_tags.
+
+    Args:
+        dataset: fiftyone dataset name
+        label_field: a label field
+        from_tags: tags with base list of class labels
+        to_tags: tags with intersection of class labels
+
+    Returns:
+        a count of sample tags for a subset
+    """
+    # TODO test this
+    diff = label_diff(
+        dataset, label_field, tags_left=from_tags, tags_right=to_tags
+    )
+    assert len(diff) > 0, "No samples to retag"
+
+    dataset = load_fiftyone_dataset(
+        dataset, include_labels={label_field: diff}
+    )
+    dataset.untag_samples(from_tags)
+    dataset.tag_samples(to_tags)
+
+    return dataset.count_sample_tags()

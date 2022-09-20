@@ -124,3 +124,14 @@ def delete_key(dataset: str, key: str):
     """
     dataset = load_fiftyone_dataset(dataset)
     dataset.delete_annotation_run(key)
+
+
+def print_status(dataset: str, key: str, backend: str) -> None:
+    dataset = load_fiftyone_dataset(dataset)
+    assert dataset.has_annotation_run(key)
+
+    backend_conf = _load_backend_config(backend)
+    backend_conf.pop("backend")
+
+    results = dataset.load_annotation_results(key, **backend_conf)
+    results.print_status()
