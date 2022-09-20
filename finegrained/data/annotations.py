@@ -110,3 +110,17 @@ def list_keys(dataset: str) -> types.LIST_STR:
     dataset = load_fiftyone_dataset(dataset)
     keys = dataset.list_annotation_runs()
     return keys
+
+
+def delete_key(dataset: str, key: str):
+    """Delete an annotation key.
+
+    Args:
+        dataset: fiftyone dataset name
+        key: annotation key
+
+    Returns:
+        none
+    """
+    dataset = load_fiftyone_dataset(dataset)
+    dataset.delete_annotation_run(key)

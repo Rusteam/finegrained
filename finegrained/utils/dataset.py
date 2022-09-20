@@ -16,6 +16,7 @@ def load_fiftyone_dataset(
     label_conf: float = 0.0,
     fields_exist: LIST_STR = None,
     not_exist: LIST_STR = None,
+    label_tags: LIST_STR = None,
 ) -> fo.DatasetView:
     """Load a dataset and apply view filters
 
@@ -29,6 +30,7 @@ def load_fiftyone_dataset(
             (only works when include_labels is specified)
         fields_exist: keep samples that contain these fields
         not_exist: keep samples that do Not contain these fields
+        label_tags: keep samples and labels that match these label tags
 
     Returns:
         a fiftyone dataset
@@ -52,6 +54,9 @@ def load_fiftyone_dataset(
     if bool(not_exist):
         for field in parse_list_str(not_exist):
             dataset = dataset.exists(field, False)
+    if bool(label_tags):
+        dataset = dataset.match_labels(tags=parse_list_str(label_tags))
+
     if bool(max_samples):
         dataset = dataset.take(min(max_samples, len(dataset)))
 

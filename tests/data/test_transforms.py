@@ -259,6 +259,7 @@ def test_map_labels(temp_dataset, to_field, mapping):
 
 def test_from_labels(temp_dataset):
     new_field = "test_from_fields"
+    from_field = "resnet18-imagenet-torch"
     transforms.map_labels(
         dataset=temp_dataset.name,
         from_field="predictions",
@@ -267,13 +268,34 @@ def test_from_labels(temp_dataset):
     )
 
     transforms.from_labels(
-        dataset=temp_dataset.name, label_field=new_field, from_field="resnet50"
+        dataset=temp_dataset.name, label_field=new_field, from_field=from_field
     )
 
-    expected_labels = get_unique_labels(temp_dataset, "resnet50")
+    expected_labels = get_unique_labels(temp_dataset, from_field)
     actual_labels = get_unique_labels(temp_dataset, new_field)
 
     assert all([l in expected_labels for l in actual_labels])
+
+
+def test_from_label_tag(temp_dataset):
+    label_tag = "test_label_tag"
+    label_field = "predictions"
+
+    no_tag, to_tag = four.random_split(temp_dataset, [0.6, 0.4])
+    for smp in to_tag:
+        det = smp[label_field].detections[0]
+        det.tags.append(label_tag)
+        smp.save()
+    # to_tag.tag_labels(label_tag)
+
+    label_values = transforms.from_label_tag(
+        dataset=temp_dataset.name,
+        label_field=label_field,
+        label_tag=label_tag
+    )
+
+    assert label_tag in label_values, f"{label_tag} not in {label_values}"
+    assert len(label_values) > 1
 
 
 @pytest.fixture(scope="function")

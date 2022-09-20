@@ -266,7 +266,7 @@ def map_labels(
     return dataset
 
 
-def _update_labels(labels: fo.Label, new_label: str):
+def _update_labels(labels: fo.Detections, new_label: str):
     for one in labels.detections:
         one.label = new_label
 
@@ -303,6 +303,30 @@ def from_labels(dataset: str, label_field: str, from_field: str, **kwargs):
     for smp in tqdm(dataset.select_fields([label_field, from_field])):
         _update_labels(smp[label_field], smp[from_field].label)
         smp.save()
+
+
+def from_label_tag(dataset: str, label_field: str, label_tag: str, **kwargs) -> dict:
+    """Update a label_field label with its label_tag.
+
+    Args:
+        dataset: fiftyone dataset name
+        label_field: a field that contains detections labels.
+        label_tag: labels that contain this tag, will be renamed to it.
+        **kwargs: dataset loading filters
+
+    Returns:
+        updated label values
+    """
+    kwargs = kwargs | {"label_tags": label_tag}
+    dataset = load_fiftyone_dataset(dataset, **kwargs)
+
+    for smp in tqdm(dataset.select_fields(label_field), desc="updating samples"):
+        for det in smp[label_field].detections:
+            if label_tag in det.tags:
+                det.label = label_tag
+                smp.save()
+
+    return dataset.count_values(f"{label_field}.detections.label")
 
 
 def combine_datasets(
