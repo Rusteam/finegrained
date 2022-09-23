@@ -3,7 +3,6 @@ from pathlib import Path
 
 import pytest
 import fiftyone as fo
-import fiftyone.zoo as foz
 import fiftyone.types as fot
 import fiftyone.utils.random as four
 from PIL import Image
@@ -11,24 +10,6 @@ from PIL import Image
 from finegrained.data import transforms, tag
 from finegrained.utils.dataset import get_unique_labels
 from finegrained.utils.os_utils import write_yaml
-
-
-@pytest.fixture(scope="module")
-def temp_dataset():
-    dataset = (
-        foz.load_zoo_dataset("quickstart")
-        .take(100)
-        .clone("test_transforms_temp")
-    )
-    model_name = "resnet18-imagenet-torch"
-    if len(dataset.exists(model_name)) < len(dataset):
-        model = foz.load_zoo_model(model_name)
-        dataset.exists(model_name, False).apply_model(
-            model, label_field=model_name, batch_size=4
-        )
-    yield dataset
-    if fo.dataset_exists(dataset.name):
-        fo.delete_dataset(dataset.name)
 
 
 @pytest.fixture(scope="function")

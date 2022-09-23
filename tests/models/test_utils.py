@@ -2,7 +2,6 @@
 """
 import pytest
 import torch
-import torchvision.transforms as T
 from PIL import Image
 
 from finegrained.models import torch_utils
@@ -22,3 +21,22 @@ def test_parse_transforms():
     output = transforms(image)
     assert output.size() == torch.Size((3, 224, 112))
     assert output.dtype == torch.float
+
+
+@pytest.mark.parametrize("device_type", [None, "cpu"])
+def test_get_device(device_type):
+    device, count = torch_utils.get_device(device_type)
+
+    if device_type is None:
+        if torch.cuda.is_available():
+            assert device.type == "cuda"
+            assert count == torch.cuda.device_count()
+        elif torch.backends.mps.is_available():
+            assert device.type == "mps"
+            assert count == 1
+        else:
+            assert device.type == "cpu"
+            assert count == 1
+    else:
+        assert device.type == device_type
+        assert count == 1

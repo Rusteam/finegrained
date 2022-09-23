@@ -12,23 +12,23 @@ from finegrained.utils import types
 cuda_available = torch.cuda.is_available()
 
 
-def get_device_count() -> int:
-    """Get a count of gpus if cuda is available."""
-    if CUDAAccelerator.is_available():
-        return CUDAAccelerator.auto_device_count()
-    elif MPSAccelerator.is_available():
-        return MPSAccelerator.auto_device_count()
-    else:
-        return 1
+def get_device(device_type: Optional[str] = None) -> tuple[torch.device, int]:
+    """Get torch.device and its count with cuda/mps if available, else cpu
 
+    Args:
+        device_type: preferred device type
 
-def get_device() -> torch.device:
-    if CUDAAccelerator.is_available():
-        return torch.device("cuda")
-    elif MPSAccelerator.is_available():
-        return torch.device("mps")
+    Returns:
+        torch.device instance and its count
+    """
+    if (device_type is None and CUDAAccelerator.is_available()) or device_type == "cuda":
+        return torch.device("cuda"), CUDAAccelerator.auto_device_count()
+    elif (device_type is None and MPSAccelerator.is_available()) or device_type == "mps":
+        return torch.device("mps"), MPSAccelerator.auto_device_count()
     else:
-        return torch.device("cpu")
+        if device_type is not None and device_type != "cpu":
+            raise ValueError(f"Unknown device type {device_type}")
+        return torch.device("cpu"), 1
 
 
 def get_default_batch_size() -> int:

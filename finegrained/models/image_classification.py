@@ -66,7 +66,7 @@ class ImageClassification(FlashFiftyOneTask, TritonExporter):
         self,
         dataset: str,
         label_field: str,
-        tags: types.DICT_STR_STR = {"train": "train", "val": "val"},
+        tags: types.DICT_STR_STR = {"train": "train", "val": "val", "test": "test"},
         **kwargs,
     ):
         dataset = load_fiftyone_dataset(dataset)
@@ -77,7 +77,7 @@ class ImageClassification(FlashFiftyOneTask, TritonExporter):
         self.data = ImageClassificationData.from_fiftyone(
             train_dataset=dataset.match_tags(tags["train"]),
             val_dataset=dataset.match_tags(tags["val"]),
-            test_dataset=dataset.match_tags(tags["test"]) if "test" in tags else None,
+            test_dataset=dataset.match_tags(tags["test"]) if "test" in dataset_tags else None,
             label_field=label_field,
             batch_size=kwargs.get("batch_size", 16),
             target_formatter=SingleLabelTargetFormatter(

@@ -16,3 +16,7 @@ def parse_list_str(value: types.LIST_STR_STR) -> types.LIST_STR:
         return value
     else:
         raise TypeError(f"{value=} is not str or list")
+
+
+def find_diff(left: list, right: list) -> list:
+    return list(set(left).difference(right))

@@ -4,14 +4,12 @@ import pytest
 import fiftyone as fo
 
 from finegrained.data import annotations
-
-from .test_transforms import coco_dataset
-
+from .conftest import temp_dataset
 
 @pytest.fixture()
-def temp_dataset(coco_dataset, backend_config):
+def temp_dataset(temp_dataset, backend_config):
     new_name = anno_key = "temp_annotations_test"
-    new = coco_dataset.clone(new_name)
+    new = temp_dataset.clone(new_name)
     yield new, new_name, anno_key
     if anno_key in new.list_annotation_runs():
         creds = deepcopy(backend_config)

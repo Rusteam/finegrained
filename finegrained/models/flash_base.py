@@ -11,7 +11,7 @@ from tqdm import tqdm
 import fiftyone as fo
 
 from finegrained.utils.dataset import load_fiftyone_dataset
-from finegrained.models.torch_utils import get_device, get_device_count
+from finegrained.models.torch_utils import get_device
 from finegrained.utils.os_utils import read_yaml
 
 
@@ -101,7 +101,7 @@ class FlashFiftyOneTask:
 
     @staticmethod
     def calculate_features(
-        model, dataloader
+            model, dataloader
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Extract embeddings for all samples in a dataloader
 
@@ -146,12 +146,13 @@ class FlashFiftyOneTask:
         assert self.model is not None, f"make sure a model is initialized"
         assert self.data is not None, f"make sure a datamodule is initialized"
 
+        device, device_count = get_device(kwargs.get("device"))
         trainer = Trainer(
             max_epochs=epochs,
             limit_train_batches=kwargs.get("limit_train_batches"),
             limit_val_batches=kwargs.get("limit_val_batches"),
-            accelerator=get_device().type,
-            devices=get_device_count()
+            accelerator=device.type,
+            devices=device_count,
         )
 
         trainer.finetune(
@@ -162,8 +163,12 @@ class FlashFiftyOneTask:
 
         trainer.save_checkpoint(kwargs.get("save_checkpoint", "model.pt"))
 
+        if (test_loader := self.data.test_dataloader()):
+            trainer.test(dataloaders=test_loader)
+
     def _predict(self):
-        trainer = Trainer(accelerator=get_device().type, devices=get_device_count())
+        device, device_count = get_device()
+        trainer = Trainer(accelerator=device.type, devices=device_count)
         predictions = trainer.predict(
             self.model,
             datamodule=self.data,
@@ -187,14 +192,14 @@ class FlashFiftyOneTask:
         self._finetune(**cfg["trainer"])
 
     def predict(
-        self,
-        dataset: str,
-        label_field: str,
-        ckpt_path: str,
-        image_size: Tuple[int, int] = (224, 224),
-        batch_size: int = 4,
-        patch_field: str = None,
-        **kwargs,
+            self,
+            dataset: str,
+            label_field: str,
+            ckpt_path: str,
+            image_size: Tuple[int, int] = (224, 224),
+            batch_size: int = 4,
+            patch_field: str = None,
+            **kwargs,
     ):
         """Classify samples from a dataset and assign values to label field
 
@@ -214,14 +219,14 @@ class FlashFiftyOneTask:
             patch_field=patch_field, **kwargs
         )
         assert (
-            self.prediction_dataset is not None
+                self.prediction_dataset is not None
         ), f"Make sure _init_prediction_datamodule() creates self.prediction_dataset"
         self._load_pretrained_model(ckpt_path)
         predictions = self._predict()
         if bool(patch_field):
             detections = _map_classifications_to_detections(predictions,
-                                                             self.patches,
-                                                             patch_field)
+                                                            self.patches,
+                                                            patch_field)
             for smp_id, det in detections.items():
                 smp = self.prediction_dataset[smp_id]
                 smp[label_field] = det
@@ -231,11 +236,11 @@ class FlashFiftyOneTask:
 
     @staticmethod
     def report(
-        dataset: str,
-        predictions: str,
-        gt_field: str = "ground_truth",
-        cmat: bool = False,
-        **kwargs,
+            dataset: str,
+            predictions: str,
+            gt_field: str = "ground_truth",
+            cmat: bool = False,
+            **kwargs,
     ):
         """Print classification report.
 

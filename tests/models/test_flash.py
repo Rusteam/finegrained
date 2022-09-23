@@ -3,12 +3,12 @@
 from pathlib import Path
 
 import fiftyone as fo
-import fiftyone.utils.splits as fous
+import fiftyone.utils.random as four
 import fiftyone.zoo as foz
 import pytest
 
 from finegrained.data.brain import compute_hardness
-from finegrained.data.dataset_utils import get_unique_labels
+from finegrained.utils.dataset import get_unique_labels
 from finegrained.data.tag import split_classes, split_dataset
 from finegrained.models import (
     ImageClassification,
@@ -38,8 +38,7 @@ def clf_config(clf_dataset, tmp_path):
             dataset=clf_dataset.name,
             label_field="ground_truth",
             batch_size=2,
-            train_transform="randaugment",
-            val_transform="nothing",
+            transform="randaugment",
             transform_kwargs=dict(image_size=(224, 112)),
         ),
         model=dict(
@@ -51,12 +50,13 @@ def clf_config(clf_dataset, tmp_path):
             limit_val_batches=2,
             save_checkpoint=str(model_path),
             strategy="freeze",
+            device="cpu",
         ),
     )
     write_yaml(cfg, cfg_path)
 
     clf_dataset.tags = []
-    fous.random_split(clf_dataset, {"train": 0.7, "val": 0.1, "test": 0.2})
+    four.random_split(clf_dataset, {"train": 0.7, "val": 0.1, "test": 0.2})
 
     yield cfg_path, model_path, clf_dataset
     cfg_path.unlink(False)
@@ -146,6 +146,7 @@ def meta_learn_cfg(clf_dataset, tmp_path):
             epochs=2,
             save_checkpoint=str(model_path),
             strategy="freeze",
+            device="cpu",
         ),
     )
     write_yaml(cfg, cfg_path)
@@ -201,6 +202,7 @@ def selfsupervised_config(clf_dataset, tmp_path):
             save_checkpoint=str(model_path),
             limit_train_batches=2,
             strategy="freeze",
+            device="cpu",
         ),
     )
     write_yaml(cfg, cfg_path)

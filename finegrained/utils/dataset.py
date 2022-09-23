@@ -10,6 +10,7 @@ from finegrained.utils.types import LIST_STR
 def load_fiftyone_dataset(
     dataset: str,
     include_labels: dict[str, LIST_STR] = {},
+    exclude_labels: dict[str, LIST_STR] = {},
     include_tags: LIST_STR = None,
     exclude_tags: LIST_STR = None,
     max_samples: int = None,
@@ -23,6 +24,7 @@ def load_fiftyone_dataset(
     Args:
         dataset: fiftyone dataset name
         include_labels: keep samples that have fields with these values
+        exclude_labels: exclude these labels (not samples) from dataset view
         include_tags: keep samples that match these sample tags
         exclude_tags: exclude samples that match these sample tags
         max_samples: randomly select this number of samples if specified
@@ -35,28 +37,39 @@ def load_fiftyone_dataset(
     Returns:
         a fiftyone dataset
     """
-    if include_tags is None:
-        include_tags = []
     dataset = fo.load_dataset(dataset)
+
+    # tags
     if bool(include_tags):
         dataset = dataset.match_tags(include_tags)
     if bool(exclude_tags):
         dataset = dataset.match_tags(exclude_tags, False)
+
+    # labels
     if bool(include_labels):
         for field, values in include_labels.items():
             filter_fn = F("label").is_in(parse_list_str(values))
             dataset = dataset.filter_labels(field, filter_fn)
             if label_conf > 0:
                 dataset = dataset.filter_labels(field, F("confidence") >= label_conf)
+    if bool(exclude_labels):
+        for field, values in exclude_labels.items():
+            filter_fn = ~F("label").is_in(parse_list_str(values))
+            dataset = dataset.filter_labels(field, filter_fn, False)
+
+    # fields
     if bool(fields_exist):
         for field in parse_list_str(fields_exist):
             dataset = dataset.exists(field)
     if bool(not_exist):
         for field in parse_list_str(not_exist):
             dataset = dataset.exists(field, False)
+
+    # label tags
     if bool(label_tags):
         dataset = dataset.match_labels(tags=parse_list_str(label_tags))
 
+    # max samples
     if bool(max_samples):
         dataset = dataset.take(min(max_samples, len(dataset)))
 

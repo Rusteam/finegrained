@@ -1,45 +1,70 @@
+import random
+
+import fiftyone.utils.random as four
 import pytest
-import fiftyone as fo
+
+import finegrained.utils.dataset as dataset_utils
+from finegrained.utils.general import find_diff
 
 
-@pytest.fixture()
-def fake_dataset():
-    new = fo.load_dataset("cavist_KB_bottles").clone("test_load_dataset")
-    yield new
-    fo.delete_dataset(new.name)
+def test_load_dataset_tags(temp_dataset):
+    four.random_split(temp_dataset, {"spl": 0.65, "rest": 0.35})
+
+    dataset = dataset_utils.load_fiftyone_dataset(temp_dataset.name, include_tags="spl")
+    tags = dataset.count_sample_tags()
+    assert "spl" in tags
+    assert "rest" not in tags
+
+    dataset = dataset_utils.load_fiftyone_dataset(temp_dataset.name, exclude_tags=["spl"])
+    tags = dataset.count_sample_tags()
+    assert "spl" not in tags
+    assert "rest" in tags
 
 
-# TODO change this
-def test_load_exists(fake_dataset):
-    dataset = utils.load_fiftyone_dataset(fake_dataset.name, fields_exist=['cavist_class_id'])
-    assert len(dataset) == 115
+def test_load_dataset_label_tags(temp_dataset):
+    n = 15
+    tag = "new_label_tag"
+    label_field = "predictions"
 
-    dataset = utils.load_fiftyone_dataset(fake_dataset.name, fields_exist='cavist_class_id_polyline')
-    assert len(dataset) == 133
+    for smp in temp_dataset.take(n):
+        det = smp[label_field].detections[-1]
+        det.tags.append(tag)
+        smp.save()
 
-    dataset = utils.load_fiftyone_dataset(fake_dataset.name, not_exist=["cavist_class_id", "cavist_class_id_polyline",
-                                                                        "cavist_class_id_detection"])
-    assert len(dataset) == 2008 - 115 - 133 - 1
-
-
-def test_load_labels(fake_dataset):
-    dataset = utils.load_fiftyone_dataset(fake_dataset.name,
-                                          include_labels={"ground_truth": ["bottle"]})
-
-    assert len(dataset) == 1818
-
-    dataset = utils.load_fiftyone_dataset(fake_dataset.name,
-                                          include_labels={"ground_truth":
-                                                              ["book", "cup", "motorcycle"]})
-
-    assert len(dataset) == 73
+    dataset = dataset_utils.load_fiftyone_dataset(temp_dataset.name,
+                                                  label_tags=tag)
+    tags = dataset.count_label_tags()
+    assert tag in tags and tags[tag] == n
+    assert len(dataset) == n
 
 
-def test_load_tags(fake_dataset):
-    dataset = utils.load_fiftyone_dataset(fake_dataset.name,
-                                          include_tags='cvat')
-    assert len(dataset) == 249
+def test_load_dataset_fields(temp_dataset):
+    field = "new-field"
+    n = 25
 
-    dataset = utils.load_fiftyone_dataset(fake_dataset.name,
-                                          exclude_tags='cvat')
-    assert len(dataset) == 2008 - 249
+    for smp in temp_dataset.take(n):
+        smp[field] = random.random()
+        smp.save()
+
+    dataset = dataset_utils.load_fiftyone_dataset(temp_dataset.name, fields_exist=field)
+    assert len(dataset) == n
+    assert dataset.has_sample_field(field)
+
+    dataset = dataset_utils.load_fiftyone_dataset(temp_dataset.name, not_exist=[field])
+    assert len(dataset) == len(temp_dataset) - n
+    assert not any(dataset.values(field))
+
+
+@pytest.mark.parametrize("label_field,filter_labels",
+                         [("predictions", ["person", "dog", "carrot", "car", "kite"]),
+                          ("resnet18-imagenet-torch", ["parachute",  "sandbar", "flagpole", "ski"])])
+def test_load_dataset_labels(temp_dataset, label_field, filter_labels):
+    dataset = dataset_utils.load_fiftyone_dataset(temp_dataset.name, include_labels={label_field: filter_labels})
+    labels = dataset_utils.get_unique_labels(dataset, label_field)
+    diff = find_diff(filter_labels, labels)
+    assert len(diff) == 0
+
+    dataset = dataset_utils.load_fiftyone_dataset(temp_dataset.name, exclude_labels={label_field: filter_labels})
+    labels = dataset_utils.get_unique_labels(dataset, label_field)
+    diff = find_diff(filter_labels, labels)
+    assert len(diff) == len(filter_labels)

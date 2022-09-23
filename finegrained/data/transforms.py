@@ -5,14 +5,13 @@ from pathlib import Path
 from typing import Optional
 
 import fiftyone as fo
-from fiftyone import ViewField as F
 from fiftyone.types import ImageClassificationDirectoryTree
 from PIL import Image, ImageOps, UnidentifiedImageError
 from tqdm import tqdm
 
 from ..utils import types
 from ..utils.dataset import load_fiftyone_dataset, create_fiftyone_dataset, get_unique_labels
-from ..utils.general import parse_list_str
+from ..utils.general import parse_list_str, find_diff
 from ..utils.os_utils import read_yaml, read_json, write_json
 
 
@@ -483,5 +482,5 @@ def label_diff(dataset: str, label_field: str, tags_left: types.LIST_STR_STR, ta
     left_labels = get_unique_labels(dataset.match_tags(tags_left), label_field)
     right_labels = get_unique_labels(dataset.match_tags(tags_right), label_field)
 
-    diff = set(left_labels).difference(right_labels)
-    return list(diff)
+    diff = find_diff(left_labels, right_labels)
+    return diff
