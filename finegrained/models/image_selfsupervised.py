@@ -20,7 +20,9 @@ class ImageSelfSupervised(FlashFiftyOneTask):
     ):
         dataset = load_fiftyone_dataset(dataset, **dataset_kwargs)
         self.data = ImageClassificationData.from_fiftyone(
-            train_dataset=dataset, batch_size=kwargs.get("batch_size", 16)
+            train_dataset=dataset,
+            label_field=kwargs.get("label_field", "ground_truth"),
+            batch_size=kwargs.get("batch_size", 16)
         )
 
     def _init_model(

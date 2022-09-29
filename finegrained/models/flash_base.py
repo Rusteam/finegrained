@@ -155,10 +155,14 @@ class FlashFiftyOneTask:
             devices=device_count,
         )
 
+        strategy = kwargs.get("strategy", ("freeze_unfreeze", 1))
+        if isinstance(strategy, list):
+            strategy = tuple(strategy)
+
         trainer.finetune(
             self.model,
             datamodule=self.data,
-            strategy=kwargs.get("strategy", ("freeze_unfreeze", 1)),
+            strategy=strategy,
         )
 
         trainer.save_checkpoint(kwargs.get("save_checkpoint", "model.pt"))
@@ -209,6 +213,7 @@ class FlashFiftyOneTask:
             ckpt_path: flash model checkpoint path
             image_size: Image size for inference
             batch_size: predictions batch size
+            patch_field: run predictions on patches on this field
             **kwargs: dataset loading filters
 
         Returns:

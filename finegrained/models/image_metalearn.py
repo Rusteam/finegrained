@@ -87,8 +87,7 @@ class ImageMetalearn(FlashFiftyOneTask):
             val_files=val_files,
             val_targets=val_targets,
             batch_size=kwargs.get("batch_size", 16),
-            train_transform=get_transform(kwargs.get("train_transform")),
-            val_transform=get_transform(kwargs.get("val_transform")),
+            transform=get_transform(kwargs.get("transform")),
             transform_kwargs=kwargs.get("transform_kwargs"),
         )
 
