@@ -76,10 +76,11 @@ def test_classification_finetune(clf_config, tmp_path):
         include_tags=["test", "val"],
         image_size=(224, 112),
     )
+    assert dataset.has_sample_field("test_temp_predictions")
 
     _ = dataset.evaluate_classifications(
         "test_temp_predictions",
-        gt_field="resnet50",
+        gt_field="resnet18-imagenet-torch",
         eval_key="test_eval_temp",
     )
 
@@ -93,6 +94,7 @@ def test_classification_finetune(clf_config, tmp_path):
         include_labels={"predictions": ["carrot", "car", "kite"]},
         max_samples=5,
     )
+    assert dataset.has_sample_field("test_temp_patches")
 
 
 @pytest.fixture

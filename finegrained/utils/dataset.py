@@ -25,7 +25,8 @@ def load_fiftyone_dataset(
         dataset: fiftyone dataset name
         include_labels: keep samples that have fields with these values
         exclude_labels: exclude these labels (not samples) from dataset view
-        include_tags: keep samples that match these sample tags
+        include_tags: keep samples that match these sample tags,
+                        or use 'all' to solely apply a confidence threshold
         exclude_tags: exclude samples that match these sample tags
         max_samples: randomly select this number of samples if specified
         label_conf: if 'include_labels' specified, apply confidence threshold
@@ -48,8 +49,9 @@ def load_fiftyone_dataset(
     # labels
     if bool(include_labels):
         for field, values in include_labels.items():
-            filter_fn = F("label").is_in(parse_list_str(values))
-            dataset = dataset.filter_labels(field, filter_fn)
+            if values != "all":  # TODO explain in docs
+                filter_fn = F("label").is_in(parse_list_str(values))
+                dataset = dataset.filter_labels(field, filter_fn)
             if label_conf > 0:
                 dataset = dataset.filter_labels(field, F("confidence") >= label_conf)
     if bool(exclude_labels):

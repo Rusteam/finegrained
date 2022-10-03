@@ -38,6 +38,7 @@ class FlashFiftyOneTask:
     _model = None
     _data = None
     _prediction_dataset = None
+    _patch_dataset = None
 
     @property
     def model(self):
@@ -70,6 +71,14 @@ class FlashFiftyOneTask:
     @prediction_dataset.setter
     def prediction_dataset(self, val):
         self._prediction_dataset = val
+
+    @property
+    def patch_dataset(self):
+        return self._patch_dataset
+
+    @patch_dataset.setter
+    def patch_dataset(self, val):
+        self._patch_dataset = val
 
     @property
     def data_keys(self):
@@ -229,12 +238,15 @@ class FlashFiftyOneTask:
         self._load_pretrained_model(ckpt_path)
         predictions = self._predict()
         if bool(patch_field):
-            detections = _map_classifications_to_detections(predictions,
-                                                            self.patches,
-                                                            patch_field)
-            for smp_id, det in detections.items():
-                smp = self.prediction_dataset[smp_id]
-                smp[label_field] = det
+            self.patch_dataset.set_values(label_field, predictions)
+
+            for smp in self.prediction_dataset:
+                detections = []
+                for det in smp[patch_field].detections:
+                    clf = self.patch_dataset[det.patch_filepath][label_field]
+                    detections.append(fo.Detection(label=clf.label, bounding_box=det.bounding_box, confidence=clf.confidence))
+
+                smp[label_field] = fo.Detections(detections=detections)
                 smp.save()
         else:
             self.prediction_dataset.set_values(label_field, predictions)

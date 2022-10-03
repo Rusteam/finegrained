@@ -1,8 +1,10 @@
 """Train, evaluate and predict with image classification models.
 """
+import tempfile
 from pathlib import Path
 from typing import Tuple
 
+import cv2
 import numpy as np
 import torch
 from PIL import Image
@@ -11,7 +13,11 @@ from flash.image import (
     ImageClassificationData,
     ImageClassifier,
 )
+import fiftyone as fo
+import fiftyone.types as fot
+import fiftyone.utils.patches as foup
 from torchvision import transforms as T
+from tqdm import tqdm
 
 from finegrained.utils.dataset import (
     load_fiftyone_dataset,
@@ -21,9 +27,6 @@ from finegrained.models.flash_base import FlashFiftyOneTask
 from finegrained.models.flash_transforms import get_transform
 from finegrained.utils import types
 from finegrained.utils.triton import TritonExporter
-
-
-# TODO split before training
 
 
 def parse_image_size(image_size: types.IMAGE_SIZE) -> Tuple[int, int]:
@@ -48,7 +51,7 @@ def parse_image_size(image_size: types.IMAGE_SIZE) -> Tuple[int, int]:
         )
 
 
-def _get_patch_array(patch_sample, patch_field) -> np.ndarray:
+def _get_patch_array(patch_sample, patch_field, transpose=False) -> np.ndarray:
     img = np.array(Image.open(patch_sample.filepath))
     img_h, img_w = img.shape[:2]
     x, y, w, h = patch_sample[patch_field].bounding_box
@@ -56,7 +59,32 @@ def _get_patch_array(patch_sample, patch_field) -> np.ndarray:
     ymin = max(0, int(img_h * y))
     xmax = min(img_w, int(img_w * (x + w)))
     ymax = min(img_h, int(img_h * (y + h)))
-    return img[ymin:ymax, xmin:xmax].transpose(2, 0, 1)
+    crop = img[ymin:ymax, xmin:xmax]
+    if transpose:
+        crop = crop.transpose(2, 0, 1)
+    return crop
+
+
+def read_rgb(path: str) -> np.ndarray:
+    img = cv2.imread(path)
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    return img
+
+
+def _to_patches(dataset: fo.Dataset, patch_field: str, write_dir: Path):
+    if not write_dir.exists():
+        write_dir.mkdir(parents=True)
+
+    i = 0
+    for smp in tqdm(dataset, "extracting patches"):
+        img = read_rgb(smp.filepath)
+        for det in smp[patch_field].detections:
+            patch = foup.extract_patch(img, det)
+            path = write_dir / f"{i:04d}.jpg"
+            cv2.imwrite(str(path), patch)
+            det["patch_filepath"] = str(path)
+            i += 1
+        smp.save()
 
 
 class ImageClassification(FlashFiftyOneTask, TritonExporter):
@@ -66,7 +94,11 @@ class ImageClassification(FlashFiftyOneTask, TritonExporter):
         self,
         dataset: str,
         label_field: str,
-        tags: types.DICT_STR_STR = {"train": "train", "val": "val", "test": "test"},
+        tags: types.DICT_STR_STR = {
+            "train": "train",
+            "val": "val",
+            "test": "test",
+        },
         **kwargs,
     ):
         dataset = load_fiftyone_dataset(dataset)
@@ -77,7 +109,9 @@ class ImageClassification(FlashFiftyOneTask, TritonExporter):
         self.data = ImageClassificationData.from_fiftyone(
             train_dataset=dataset.match_tags(tags["train"]),
             val_dataset=dataset.match_tags(tags["val"]),
-            test_dataset=dataset.match_tags(tags["test"]) if "test" in dataset_tags else None,
+            test_dataset=dataset.match_tags(tags["test"])
+            if "test" in dataset_tags
+            else None,
             label_field=label_field,
             batch_size=kwargs.get("batch_size", 16),
             target_formatter=SingleLabelTargetFormatter(
@@ -98,13 +132,15 @@ class ImageClassification(FlashFiftyOneTask, TritonExporter):
         self.prediction_dataset = load_fiftyone_dataset(dataset, **kwargs)
         if bool(patch_field):
             assert self.prediction_dataset.has_sample_field(patch_field)
-            self.patches = self.prediction_dataset.to_patches(patch_field)
 
-            arrays = [
-                _get_patch_array(smp, patch_field) for smp in self.patches
-            ]
-            self.data = ImageClassificationData.from_numpy(
-                predict_data=arrays,
+            export_dir = Path(tempfile.TemporaryDirectory().name).resolve() / "export"
+
+            _to_patches(self.prediction_dataset, patch_field, export_dir)
+            self.patch_dataset = fo.Dataset.from_images_dir(str(export_dir))
+            self.patch_dataset.persistent = False
+
+            self.data = ImageClassificationData.from_fiftyone(
+                predict_dataset=self.patch_dataset,
                 batch_size=batch_size,
                 transform_kwargs=dict(image_size=image_size),
             )
@@ -138,7 +174,9 @@ class ImageClassification(FlashFiftyOneTask, TritonExporter):
         h, w = parse_image_size(image_size)
         return (torch.randn(2, 3, h, w),)
 
-    def _create_triton_config(self, image_size: types.IMAGE_SIZE, **kwargs) -> dict:
+    def _create_triton_config(
+        self, image_size: types.IMAGE_SIZE, **kwargs
+    ) -> dict:
         h, w = parse_image_size(image_size)
         return {
             "backend": "onnxruntime",
@@ -179,20 +217,16 @@ class ImageClassification(FlashFiftyOneTask, TritonExporter):
             "backend": "python",
             "max_batch_size": self.triton_batch_size,
             "input": [
-                dict(
-                    name="IMAGE",
-                    dims=[-1, -1, 3],
-                    data_type="TYPE_UINT8"
-                )
+                dict(name="IMAGE", dims=[-1, -1, 3], data_type="TYPE_UINT8")
             ],
             "output": [
                 dict(
                     name="CLASS_PROBS",
                     dims=[-1],
                     data_type="TYPE_FP32",
-                    label_filename=self.triton_labels_path
+                    label_filename=self.triton_labels_path,
                 )
-            ]
+            ],
         }
 
     def _generate_triton_python_names(
@@ -203,16 +237,14 @@ class ImageClassification(FlashFiftyOneTask, TritonExporter):
             f"classifier={classifier_name}",
         ]
 
-    def _create_triton_ensemble_config(self, preprocessing_name: str, classifier_name: str):
+    def _create_triton_ensemble_config(
+        self, preprocessing_name: str, classifier_name: str
+    ):
         return {
             "platform": "ensemble",
             "max_batch_size": 1,
             "input": [
-                dict(
-                    name="IMAGE",
-                    dims=[-1, -1, 3],
-                    data_type="TYPE_UINT8"
-                )
+                dict(name="IMAGE", dims=[-1, -1, 3], data_type="TYPE_UINT8")
             ],
             "output": [
                 dict(
@@ -265,7 +297,7 @@ class ImageTransform(torch.nn.Module, TritonExporter):
         dummy = torch.randint(
             0, 255, size=(1, h * 2 + 1, w * 3 - 10, 3), dtype=torch.uint8
         )
-        return dummy,
+        return (dummy,)
 
     @property
     def dynamic_axes(self):
