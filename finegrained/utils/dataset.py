@@ -49,11 +49,11 @@ def load_fiftyone_dataset(
     # labels
     if bool(include_labels):
         for field, values in include_labels.items():
+            if label_conf > 0:
+                dataset = dataset.filter_labels(field, F("confidence") >= label_conf)
             if values != "all":  # TODO explain in docs
                 filter_fn = F("label").is_in(parse_list_str(values))
                 dataset = dataset.filter_labels(field, filter_fn)
-            if label_conf > 0:
-                dataset = dataset.filter_labels(field, F("confidence") >= label_conf)
     if bool(exclude_labels):
         for field, values in exclude_labels.items():
             filter_fn = ~F("label").is_in(parse_list_str(values))
