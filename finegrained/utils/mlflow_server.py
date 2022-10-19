@@ -61,6 +61,7 @@ def parse_tensorboard_scalars(scalars: SCALAR_TYPE) -> list[dict]:
     test_accuracy = _get_scalar_values(scalars, tag="test_accuracy")
     test_ce = _get_scalar_values(scalars, tag="test_cross_entropy")
     epoch = sorted(list(set(_get_scalar_values(scalars, tag="epoch"))))
+    epoch = list(map(int, epoch))
 
     df = pd.DataFrame({
         "train_accuracy": train_accuracy,

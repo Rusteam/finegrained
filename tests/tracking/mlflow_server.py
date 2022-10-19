@@ -32,6 +32,14 @@ def tfevents():
     return EVENTS, HPARAMS, CKPT
 
 
+@pytest.fixture(scope="function")
+def onnx_model(tmp_path):
+    dest = tmp_path / "model.onnx"
+    model = torch.nn.Softmax(dim=1)
+    torch.onnx.export(model, torch.randn(1, 10), str(dest))
+    return dest
+
+
 @pytest.mark.parametrize("file", EVENTS)
 def test_read_tensorboard_scalars(file):
     scalars = mlflow_server.read_tensorboard_scalars(str(file))
@@ -67,7 +75,7 @@ def test_get_tensorboard_files(tfevents):
     assert ckpt.suffix == ".ckpt"
 
 
-def test_log_run(mlflow_tracking, tfevents, tmp_path):
+def test_log_run(mlflow_tracking, tfevents, onnx_model, tmp_path):
     tracking_uri, artifact_location = mlflow_tracking
     events, hparams, ckpt = tfevents
     events = events[0]
@@ -80,6 +88,7 @@ def test_log_run(mlflow_tracking, tfevents, tmp_path):
         events=str(events),
         hparams=str(hparams),
         ckpt=str(ckpt),
+        model=str(onnx_model),
         experiment_name=exp_name,
     )
 
@@ -132,7 +141,7 @@ def test_log_run(mlflow_tracking, tfevents, tmp_path):
     assert actual_keys == expected_keys
 
     # model
-    # TODO complete
-    # artifacts = client.list_artifacts(run.info.run_id, path="model")
-    # assert len(artifacts) == 4
-    # assert any([a.path == "model/model.onnx" for a in artifacts])
+    assert "model" in artifact_paths
+    model_artifacts = client.list_artifacts(run_id, path="model")
+    assert len(model_artifacts) == 5
+    assert any([a.path == "model/model.onnx" for a in model_artifacts])

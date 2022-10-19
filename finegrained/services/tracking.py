@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Optional
 
 import mlflow
+import onnx
 
 from finegrained.utils import mlflow_server
 from finegrained.utils.mlflow_server import get_tensorboard_files
@@ -60,6 +61,7 @@ def log_run(
     events: Optional[str] = None,
     hparams: Optional[str] = None,
     ckpt: Optional[str] = None,
+    model: Optional[str] = None,
     log_dir: Optional[str] = None,
     tracking_uri: str = "./mlruns",
     experiment_name: Optional[str] = None,
@@ -74,6 +76,7 @@ def log_run(
         events: path to tensorboard events file as metrics
         hparams: path to hparams.yaml file as params and labels
         ckpt: path to torch checkpoint file or a dir with checkpoint files
+        model: path to onnx model to log as MLflow models
         log_dir: provide path to tensorboard log dir in order to automatically
             get events, hparams and ckpt paths.
         tracking_uri: mlflow tracking uri
@@ -102,5 +105,18 @@ def log_run(
             log_hparams(hparams)
         if ckpt:
             log_ckpt(ckpt)
+        if model:
+            log_model(model)
 
     return run_id
+
+
+def log_model(path: str) -> None:
+    """Log ONNX model to MLflow run.
+
+    Args:
+        path: path to onnx model file
+    """
+    assert path.endswith(".onnx")
+    model = onnx.load_model(path)
+    mlflow.onnx.log_model(model, artifact_path="model")

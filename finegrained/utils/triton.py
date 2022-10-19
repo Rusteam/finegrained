@@ -101,6 +101,8 @@ class TritonExporter:
             write_path: where to save onnx model (*.onnx extension)
             image_size: model input size
         """
+        # TODO create output dir if not exist
+        # TODO use same dir by default
         model = self._load_model_torch(model_path)
         dummy = self.generate_dummy_inputs(**kwargs)
         torch.onnx.export(
