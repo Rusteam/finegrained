@@ -1,0 +1,6 @@
+tests/files/tensorboard/events.out.tfevents.1663861466.rgaliullin0lm.35424.0 filter=lfs diff=lfs merge=lfs -text
+tests/files/tensorboard/events.out.tfevents.1663864826.rgaliullin0lm.35424.1 filter=lfs diff=lfs merge=lfs -text
+tests/files/tensorboard/hparams.yaml filter=lfs diff=lfs merge=lfs -text
+tests/files/tensorboard filter=lfs diff=lfs merge=lfs -text
+tests/files/tensorboard/checkpoints filter=lfs diff=lfs merge=lfs -text
+tests/files/tensorboard/checkpoints/epoch=24-step=5725.ckpt filter=lfs diff=lfs merge=lfs -text
