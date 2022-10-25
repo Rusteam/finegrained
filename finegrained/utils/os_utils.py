@@ -5,6 +5,8 @@ from typing import Optional, Union
 
 import yaml
 
+# TODO rename to io.py
+
 
 def read_txt(filepath: str):
     return Path(filepath).read_text().strip().split("\n")

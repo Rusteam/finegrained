@@ -1,5 +1,6 @@
 """Log metrics and models to MLflow.
 """
+import os
 from pathlib import Path
 from typing import Optional
 
@@ -8,7 +9,7 @@ import onnx
 
 from finegrained.utils import mlflow_server
 from finegrained.utils.mlflow_server import get_tensorboard_files
-from finegrained.utils.os_utils import read_yaml
+from finegrained.utils.os_utils import read_yaml, read_file_config
 
 
 def log_events(path: str | list) -> None:
@@ -51,9 +52,9 @@ def log_ckpt(path: str) -> None:
     """
     path = Path(path)
     if path.is_file():
-        mlflow.log_artifact(path, "checkpoints")
+        mlflow.log_artifact(str(path), "checkpoints")
     else:
-        mlflow.log_artifacts(path, "checkpoints")
+        mlflow.log_artifacts(str(path), "checkpoints")
 
 
 def log_run(
@@ -66,6 +67,7 @@ def log_run(
     tracking_uri: str = "./mlruns",
     experiment_name: Optional[str] = None,
     artifact_location: Optional[str] = None,
+    env: Optional[str] = None,
 ):
     """Connect to MLflow and log metrics, params and files.
 
@@ -83,6 +85,7 @@ def log_run(
         experiment_name: if set, use this experiment name (if does not exist, creates a new one)
         artifact_location: set artifact location for this experiment
                             (applicable only when a new experiment created)
+        env: path to a file with environment variables for MLflow S3
 
     Returns:
         MLflow run id
@@ -92,6 +95,10 @@ def log_run(
     mlflow_server.connect_to_mlflow(tracking_uri,
                                     experiment_name=experiment_name,
                                     artifact_location=artifact_location)
+    if env:
+        env = read_file_config(env)
+        for k, v in env.items():
+            os.environ[k] = v
 
     if log_dir:
         events, hparams, ckpt = get_tensorboard_files(log_dir)
