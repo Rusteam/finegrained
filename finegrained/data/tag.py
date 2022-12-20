@@ -6,7 +6,7 @@ from fiftyone import ViewField as F
 from fiftyone.utils import random as four
 from sklearn.model_selection import train_test_split
 
-from finegrained.data.transforms import label_diff
+from finegrained.data.display import label_diff
 from finegrained.utils.dataset import (
     load_fiftyone_dataset,
 )

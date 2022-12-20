@@ -7,7 +7,7 @@ import fiftyone.types as fot
 import fiftyone.utils.random as four
 from PIL import Image
 
-from finegrained.data import transforms, tag
+from finegrained.data import transforms
 from finegrained.utils.dataset import get_unique_labels
 from finegrained.utils.os_utils import write_yaml
 
@@ -56,15 +56,6 @@ def test_to_patches(to_patches_conf, temp_dataset, label_field, splits):
         assert all([s in tag_counts for s in splits])
 
 
-def test_tag_samples(temp_dataset):
-    tag_name = "new_tag"
-    tag_counts = tag.tag_samples(temp_dataset.name, tag_name)
-
-    assert tag_name in tag_counts
-    assert tag_counts[tag_name] == len(temp_dataset)
-    assert "not_existing_tag" not in tag_counts
-
-
 def test_delete_field(temp_dataset):
     temp_dataset.clone_sample_field("ground_truth", "new")
     temp_dataset.clone_sample_field("new", "new_clone")
@@ -74,18 +65,6 @@ def test_delete_field(temp_dataset):
     transforms.delete_field(temp_dataset.name, ["new", "new_clone"])
     for field in ["new", "new_clone", "last_clone"]:
         assert not temp_dataset.has_sample_field(field)
-
-
-@pytest.mark.parametrize(
-    "splits", [{"rain": 0.65, "text": 0.35}, {"a": 0.5, "b": 0.5, "c": 0.5}]
-)
-def test_split_dataset(temp_dataset, splits):
-    tag_counts = tag.split_dataset(temp_dataset.name, splits)
-
-    data_len = len(temp_dataset)
-    total = sum(list(splits.values()))
-    for k, v in splits.items():
-        assert v / total * data_len - tag_counts[k] <= 1
 
 
 def test_prefix_label(temp_dataset):
@@ -98,42 +77,6 @@ def test_prefix_label(temp_dataset):
 
     for smp in dataset.select_fields("with_prefix"):
         assert smp["with_prefix"].label.startswith("new")
-
-
-@pytest.mark.parametrize("vertical", [True, False])
-def test_alignment(temp_dataset, vertical):
-    tag_counts = tag.tag_alignment(temp_dataset.name, vertical=vertical)
-
-    aligment_tag = "vertical" if vertical else "horizontal"
-    assert aligment_tag in tag_counts
-    assert tag_counts[aligment_tag] > 0
-
-
-def test_split_classes(temp_dataset):
-    tag.split_classes(
-        temp_dataset.name,
-        "resnet50",
-        train_size=0.6,
-        val_size=0.4,
-        min_samples=2,
-    )
-
-    train_labels = get_unique_labels(
-        temp_dataset.match_tags("train"), "resnet50"
-    )
-    val_labels = get_unique_labels(temp_dataset.match_tags("val"), "resnet50")
-    num_intersect = len(set(train_labels).intersection(val_labels))
-    assert num_intersect == 0
-
-    label_counts = temp_dataset.match_tags("train").count_values(
-        "resnet50.label"
-    )
-    assert min(label_counts.values()) >= 2
-
-    label_counts = temp_dataset.match_tags("val").count_values(
-        "resnet50.label"
-    )
-    assert min(label_counts.values()) >= 2
 
 
 def test_merge_diff(temp_dataset, tmp_path):
@@ -358,19 +301,3 @@ def test_transpose_images(temp_dataset, tmp_path):
         new_size = Image.open(p).size
         assert new_size[1] == size[0]
         assert new_size[0] == size[1]
-
-@pytest.mark.parametrize("avg_size", [False, True])
-def test_compute_area(temp_dataset, avg_size):
-    field = temp_dataset.make_unique_field_name()
-    min_area, max_area = transforms.compute_area(
-        dataset=temp_dataset.name,
-        field=field,
-        average_size=avg_size
-    )
-
-    assert max_area > min_area
-
-    if avg_size:
-        assert max_area < 1000
-    else:
-        assert max_area > 1000
