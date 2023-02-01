@@ -10,9 +10,7 @@ from finegrained.utils.general import find_diff
 def test_load_dataset_tags(temp_dataset):
     four.random_split(temp_dataset, {"spl": 0.65, "rest": 0.35})
 
-    dataset = dataset_utils.load_fiftyone_dataset(
-        temp_dataset.name, include_tags="spl"
-    )
+    dataset = dataset_utils.load_fiftyone_dataset(temp_dataset.name, include_tags="spl")
     tags = dataset.count_sample_tags()
     assert "spl" in tags
     assert "rest" not in tags
@@ -35,9 +33,7 @@ def test_load_dataset_label_tags(temp_dataset):
         det.tags.append(tag)
         smp.save()
 
-    dataset = dataset_utils.load_fiftyone_dataset(
-        temp_dataset.name, label_tags=tag
-    )
+    dataset = dataset_utils.load_fiftyone_dataset(temp_dataset.name, label_tags=tag)
     tags = dataset.count_label_tags()
     assert tag in tags and tags[tag] == n
     assert len(dataset) == n
@@ -51,15 +47,11 @@ def test_load_dataset_fields(temp_dataset):
         smp[field] = random.random()
         smp.save()
 
-    dataset = dataset_utils.load_fiftyone_dataset(
-        temp_dataset.name, fields_exist=field
-    )
+    dataset = dataset_utils.load_fiftyone_dataset(temp_dataset.name, fields_exist=field)
     assert len(dataset) == n
     assert dataset.has_sample_field(field)
 
-    dataset = dataset_utils.load_fiftyone_dataset(
-        temp_dataset.name, not_exist=[field]
-    )
+    dataset = dataset_utils.load_fiftyone_dataset(temp_dataset.name, not_exist=[field])
     assert len(dataset) == len(temp_dataset) - n
     assert not any(dataset.values(field))
 
@@ -81,11 +73,11 @@ def test_load_dataset_fields(temp_dataset):
         ),
     ],
 )
-def test_load_dataset_labels(
-    temp_dataset, label_field, filter_labels, label_conf
-):
+def test_load_dataset_labels(temp_dataset, label_field, filter_labels, label_conf):
     dataset = dataset_utils.load_fiftyone_dataset(
-        temp_dataset.name, include_labels={label_field: filter_labels}, label_conf=label_conf
+        temp_dataset.name,
+        include_labels={label_field: filter_labels},
+        label_conf=label_conf,
     )
 
     labels = dataset_utils.get_unique_labels(dataset, label_field)

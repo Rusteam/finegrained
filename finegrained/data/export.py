@@ -4,10 +4,7 @@ from typing import List
 
 import fiftyone.types as fot
 
-from finegrained.utils.dataset import (
-    load_fiftyone_dataset,
-    get_unique_labels,
-)
+from finegrained.utils.dataset import get_unique_labels, load_fiftyone_dataset
 
 
 def to_yolov5(

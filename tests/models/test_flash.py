@@ -8,23 +8,17 @@ import fiftyone.zoo as foz
 import pytest
 
 from finegrained.data.brain import compute_hardness
-from finegrained.utils.dataset import get_unique_labels
 from finegrained.data.tag import split_classes, split_dataset
-from finegrained.models import (
-    ImageClassification,
-    ImageSelfSupervised,
-    ImageMetalearn,
-)
-from finegrained.utils.os_utils import write_yaml, read_yaml
+from finegrained.models import ImageClassification, ImageMetalearn, ImageSelfSupervised
+from finegrained.utils.dataset import get_unique_labels
+from finegrained.utils.os_utils import read_yaml, write_yaml
 
 
 @pytest.fixture(scope="module")
 def clf_dataset():
     if fo.dataset_exists("train_test_temp"):
         fo.delete_dataset("train_test_temp")
-    dataset = (
-        foz.load_zoo_dataset("quickstart").take(100).clone("train_test_temp")
-    )
+    dataset = foz.load_zoo_dataset("quickstart").take(100).clone("train_test_temp")
     yield dataset
     fo.delete_dataset(dataset.name)
 
@@ -124,9 +118,7 @@ def meta_learn_cfg(clf_dataset, tmp_path):
             training_strategy="prototypicalnetworks",
             training_strategy_kwargs=dict(
                 ways=len(
-                    get_unique_labels(
-                        clf_dataset.match_tags("train"), label_field
-                    )
+                    get_unique_labels(clf_dataset.match_tags("train"), label_field)
                 ),
                 meta_batch_size=2,
                 shots=2,
@@ -134,9 +126,7 @@ def meta_learn_cfg(clf_dataset, tmp_path):
                 num_task=-1,
                 epoch_length=2,
                 test_ways=len(
-                    get_unique_labels(
-                        clf_dataset.match_tags("test"), label_field
-                    )
+                    get_unique_labels(clf_dataset.match_tags("test"), label_field)
                 ),
                 test_shots=2,
                 test_queries=1,
@@ -169,9 +159,9 @@ def test_metalearning_finetune(meta_learn_cfg):
     img_meta.predict(
         support_dataset=conf["data"]["dataset"],
         support_label_field="resnet50",
-        ckpt_path=str(model_path),
         query_dataset=conf["data"]["dataset"],
         query_label_field="new_label_prediction",
+        ckpt_path=str(model_path),
         image_size=(280, 140),
         batch_size=4,
         support_kwargs=dict(include_tags=["support"]),

@@ -1,10 +1,10 @@
 import shutil
 from pathlib import Path
 
-import pytest
 import fiftyone as fo
 import fiftyone.types as fot
 import fiftyone.utils.random as four
+import pytest
 from PIL import Image
 
 from finegrained.data import transforms
@@ -89,9 +89,7 @@ def test_merge_diff(temp_dataset, tmp_path):
     # merge all new samples
     subset.export(export_dir=str(export_dir), dataset_type=fot.ImageDirectory)
 
-    transforms.merge_diff(
-        temp_dataset.name, image_dir=export_dir, tags=["merged_test"]
-    )
+    transforms.merge_diff(temp_dataset.name, image_dir=export_dir, tags=["merged_test"])
     # extra n samples added
     assert len(temp_dataset) == N + n
     assert len(temp_dataset.match_tags("merged_test")) == n
@@ -107,9 +105,7 @@ def test_merge_diff(temp_dataset, tmp_path):
         dest_file = dest_file.with_stem(dest_file.stem + "_new")
         shutil.copy(src_file, dest_file)
 
-    transforms.merge_diff(
-        temp_dataset.name, export_dir, tags=["merged_test_2"]
-    )
+    transforms.merge_diff(temp_dataset.name, export_dir, tags=["merged_test_2"])
     # extract n//2 samples added
     assert len(temp_dataset) == N + n + n // 2
     assert len(temp_dataset.match_tags("merged_test")) == n
@@ -150,9 +146,7 @@ def test_delete_samples(temp_dataset, tmp_path):
     [
         (
             "new_labels",
-            dict(
-                carrot="veg", car="transport", boat="transport", broccoli="veg"
-            ),
+            dict(carrot="veg", car="transport", boat="transport", broccoli="veg"),
         ),
         ("same_field", {}),
     ],
@@ -198,7 +192,7 @@ def test_from_labels(temp_dataset):
     expected_labels = get_unique_labels(temp_dataset, from_field)
     actual_labels = get_unique_labels(temp_dataset, new_field)
 
-    assert all([l in expected_labels for l in actual_labels])
+    assert all([lab in expected_labels for lab in actual_labels])
 
 
 def test_from_label_tag(temp_dataset):
@@ -213,9 +207,7 @@ def test_from_label_tag(temp_dataset):
     # to_tag.tag_labels(label_tag)
 
     label_values = transforms.from_label_tag(
-        dataset=temp_dataset.name,
-        label_field=label_field,
-        label_tag=label_tag
+        dataset=temp_dataset.name, label_field=label_field, label_tag=label_tag
     )
 
     assert label_tag in label_values, f"{label_tag} not in {label_values}"
@@ -252,9 +244,7 @@ def combine_cfg_path(tmp_path):
             dict(
                 name="quickstart",
                 filters=dict(
-                    include_labels=dict(
-                        ground_truth=["bear", "bed", "banana"]
-                    ),
+                    include_labels=dict(ground_truth=["bear", "bed", "banana"]),
                 ),
                 label_field="ground_truth",
                 tags=["val", "quick"],
@@ -289,9 +279,7 @@ def test_transpose_images(temp_dataset, tmp_path):
         label_field="ground_truth",
     )
 
-    new = fo.Dataset.from_dir(
-        dataset_dir=dataset_dir, dataset_type=dataset_type
-    )
+    new = fo.Dataset.from_dir(dataset_dir=dataset_dir, dataset_type=dataset_type)
     new.persistent = False
 
     sizes = [Image.open(p).size for p in new.values("filepath")]

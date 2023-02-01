@@ -2,8 +2,8 @@
 """
 from flash.image import ImageClassificationData, ImageEmbedder
 
-from finegrained.utils.dataset import load_fiftyone_dataset
 from finegrained.models.flash_base import FlashFiftyOneTask
+from finegrained.utils.dataset import load_fiftyone_dataset
 
 # TODO finish here
 
@@ -15,14 +15,12 @@ class ImageSelfSupervised(FlashFiftyOneTask):
     def data_keys(self):
         return ["dataset"]
 
-    def _init_training_datamodule(
-        self, dataset: str, dataset_kwargs={}, **kwargs
-    ):
+    def _init_training_datamodule(self, dataset: str, dataset_kwargs={}, **kwargs):
         dataset = load_fiftyone_dataset(dataset, **dataset_kwargs)
         self.data = ImageClassificationData.from_fiftyone(
             train_dataset=dataset,
             label_field=kwargs.get("label_field", "ground_truth"),
-            batch_size=kwargs.get("batch_size", 16)
+            batch_size=kwargs.get("batch_size", 16),
         )
 
     def _init_model(

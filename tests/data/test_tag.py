@@ -43,19 +43,13 @@ def test_split_classes(temp_dataset):
         min_samples=2,
     )
 
-    train_labels = get_unique_labels(
-        temp_dataset.match_tags("train"), "resnet50"
-    )
+    train_labels = get_unique_labels(temp_dataset.match_tags("train"), "resnet50")
     val_labels = get_unique_labels(temp_dataset.match_tags("val"), "resnet50")
     num_intersect = len(set(train_labels).intersection(val_labels))
     assert num_intersect == 0
 
-    label_counts = temp_dataset.match_tags("train").count_values(
-        "resnet50.label"
-    )
+    label_counts = temp_dataset.match_tags("train").count_values("resnet50.label")
     assert min(label_counts.values()) >= 2
 
-    label_counts = temp_dataset.match_tags("val").count_values(
-        "resnet50.label"
-    )
+    label_counts = temp_dataset.match_tags("val").count_values("resnet50.label")
     assert min(label_counts.values()) >= 2

@@ -9,8 +9,11 @@ from onnxruntime import InferenceSession
 from transformers.utils import to_numpy
 
 from finegrained.models import SentenceEmbeddings
-from tests.models.test_export import _check_triton_onnx, _check_triton_python, \
-    _check_triton_ensemble
+from tests.models.test_export import (
+    _check_triton_ensemble,
+    _check_triton_onnx,
+    _check_triton_python,
+)
 
 SENTENCE_EMBEDDINGS = ["symanto/sn-xlm-roberta-base-snli-mnli-anli-xnli"]
 
@@ -27,17 +30,10 @@ def test_onnx(model_name, tmp_path):
     with torch.no_grad():
         model_out = sent_emb._model(*dummy)
 
-    input_feed = {
-        k: to_numpy(v)
-        for k, v in zip(sent_emb.input_names, dummy)
-    }
-    ort_out = ort.run(
-        output_names=sent_emb.output_names, input_feed=input_feed
-    )
+    input_feed = {k: to_numpy(v) for k, v in zip(sent_emb.input_names, dummy)}
+    ort_out = ort.run(output_names=sent_emb.output_names, input_feed=input_feed)
 
-    np.testing.assert_allclose(
-        model_out[0].numpy(), ort_out[0], atol=1e-4, rtol=1e-2
-    )
+    np.testing.assert_allclose(model_out[0].numpy(), ort_out[0], atol=1e-4, rtol=1e-2)
 
 
 @pytest.mark.parametrize("model_name", SENTENCE_EMBEDDINGS)

@@ -2,7 +2,7 @@
 """
 from finegrained.data.transforms import delete_field
 from finegrained.utils import types
-from finegrained.utils.dataset import load_fiftyone_dataset, get_unique_labels
+from finegrained.utils.dataset import get_unique_labels, load_fiftyone_dataset
 from finegrained.utils.general import find_diff
 
 
@@ -22,11 +22,11 @@ def print_labels(dataset: str, label_field: str) -> None:
 
 
 def classification_report(
-        dataset: str,
-        predictions: str,
-        gt_field: str = "ground_truth",
-        cmat: bool = False,
-        **kwargs,
+    dataset: str,
+    predictions: str,
+    gt_field: str = "ground_truth",
+    cmat: bool = False,
+    **kwargs,
 ):
     """Print classification report.
 
@@ -51,7 +51,12 @@ def classification_report(
         cm.show()
 
 
-def label_diff(dataset: str, label_field: str, tags_left: types.LIST_STR_STR, tags_right: types.LIST_STR_STR):
+def label_diff(
+    dataset: str,
+    label_field: str,
+    tags_left: types.LIST_STR_STR,
+    tags_right: types.LIST_STR_STR,
+):
     """Compute difference between two sets of labels.
 
     Args:
@@ -74,12 +79,12 @@ def label_diff(dataset: str, label_field: str, tags_left: types.LIST_STR_STR, ta
 
 
 def compute_area(
-        dataset: str,
-        field: str = "area",
-        average_size: bool = False,
-        overwrite_metadata: bool = False,
-        overwrite: bool = False,
-        **kwargs,
+    dataset: str,
+    field: str = "area",
+    average_size: bool = False,
+    overwrite_metadata: bool = False,
+    overwrite: bool = False,
+    **kwargs,
 ) -> tuple[int, int]:
     """Calculate area of an image based on metadata
 
@@ -104,7 +109,10 @@ def compute_area(
     dataset.compute_metadata(overwrite=overwrite_metadata)
     for smp in dataset.select_fields("metadata"):
         val = (
-                      smp.metadata.width + smp.metadata.height) / 2 if average_size else smp.metadata.width * smp.metadata.height
+            (smp.metadata.width + smp.metadata.height) / 2
+            if average_size
+            else smp.metadata.width * smp.metadata.height
+        )
         smp[field] = val
         smp.save()
 

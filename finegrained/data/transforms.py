@@ -10,16 +10,16 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 from tqdm import tqdm
 
 from ..utils import types
-from ..utils.dataset import load_fiftyone_dataset, create_fiftyone_dataset
+from ..utils.dataset import create_fiftyone_dataset, load_fiftyone_dataset
 from ..utils.general import parse_list_str
-from ..utils.os_utils import read_yaml, read_json, write_json
+from ..utils.os_utils import read_json, read_yaml, write_json
 
 
 def _export_patches(
-        dataset: fo.Dataset,
-        label_field: str,
-        export_dir: Path,
-        splits: Optional[list[str]] = None,
+    dataset: fo.Dataset,
+    label_field: str,
+    export_dir: Path,
+    splits: Optional[list[str]] = None,
 ) -> None:
     label_type = dataset.get_field(label_field)
     if label_type is None:
@@ -47,13 +47,13 @@ def _export_patches(
 
 
 def to_patches(
-        dataset: str,
-        label_field: str | list[str],
-        to_name: str,
-        export_dir: str,
-        overwrite: bool = False,
-        splits: Optional[list[str]] = None,
-        **kwargs,
+    dataset: str,
+    label_field: str | list[str],
+    to_name: str,
+    export_dir: str,
+    overwrite: bool = False,
+    splits: Optional[list[str]] = None,
+    **kwargs,
 ) -> fo.Dataset:
     """Crop out patches from a dataset and create a new one.
 
@@ -79,7 +79,8 @@ def to_patches(
             )
         if export_dir.exists():
             raise ValueError(
-                f"{str(export_dir)=} already exists. User --overwrite or delete it manually"
+                f"{str(export_dir)=} already exists. "
+                "User --overwrite or delete it manually"
             )
     else:
         if export_dir.exists():
@@ -160,10 +161,10 @@ def prefix_label(dataset: str, label_field: str, dest_field: str, prefix: str):
 
 
 def merge_diff(
-        dataset: str,
-        image_dir: str,
-        tags: types.LIST_STR_STR = None,
-        recursive: bool = True,
+    dataset: str,
+    image_dir: str,
+    tags: types.LIST_STR_STR = None,
+    recursive: bool = True,
 ):
     """Merge new files into an existing dataset.
 
@@ -181,9 +182,7 @@ def merge_diff(
         an updated fiftyone dataset
     """
     dataset = load_fiftyone_dataset(dataset)
-    second = fo.Dataset.from_images_dir(
-        image_dir, tags=tags, recursive=recursive
-    )
+    second = fo.Dataset.from_images_dir(image_dir, tags=tags, recursive=recursive)
     dataset.merge_samples(second, skip_existing=True)
     return dataset
 
@@ -232,12 +231,12 @@ def exif_transpose(dataset: str, **kwargs):
 
 
 def map_labels(
-        dataset: str,
-        from_field: str,
-        to_field: str,
-        label_mapping: Optional[dict] = None,
-        overwrite: bool = False,
-        **kwargs,
+    dataset: str,
+    from_field: str,
+    to_field: str,
+    label_mapping: Optional[dict] = None,
+    overwrite: bool = False,
+    **kwargs,
 ) -> fo.DatasetView:
     """Create a new dataset field with mapped labels.
 
@@ -287,16 +286,14 @@ def from_labels(dataset: str, label_field: str, from_field: str, **kwargs):
         label_field
     ), f"Dataset does not contain {label_field=}."
     assert (
-               doc_type := dataset.get_field(label_field).document_type
-           ) == fo.Detections, (
-        f"{label_field=} has to be of type Detections, got {doc_type=}."
-    )
+        doc_type := dataset.get_field(label_field).document_type
+    ) == fo.Detections, f"{label_field=} has to be of type Detections, got {doc_type=}."
     assert dataset.has_sample_field(
         from_field
     ), f"Dataset does not contain {from_field=}."
     assert (
-               doc_type := dataset.get_field(from_field).document_type
-           ) == fo.Classification, (
+        doc_type := dataset.get_field(from_field).document_type
+    ) == fo.Classification, (
         f"{from_field=} has to be of type Detections, got {doc_type=}."
     )
 
@@ -305,9 +302,7 @@ def from_labels(dataset: str, label_field: str, from_field: str, **kwargs):
         smp.save()
 
 
-def from_label_tag(
-        dataset: str, label_field: str, label_tag: str, **kwargs
-) -> dict:
+def from_label_tag(dataset: str, label_field: str, label_tag: str, **kwargs) -> dict:
     """Update a label_field label with its label_tag.
 
     Args:
@@ -322,9 +317,7 @@ def from_label_tag(
     kwargs = kwargs | {"label_tags": label_tag}
     dataset = load_fiftyone_dataset(dataset, **kwargs)
 
-    for smp in tqdm(
-            dataset.select_fields(label_field), desc="updating samples"
-    ):
+    for smp in tqdm(dataset.select_fields(label_field), desc="updating samples"):
         for det in smp[label_field].detections:
             if label_tag in det.tags:
                 det.label = label_tag
@@ -334,11 +327,11 @@ def from_label_tag(
 
 
 def combine_datasets(
-        dest_name: str,
-        label_field: str,
-        cfg: str,
-        persistent: bool = True,
-        overwrite: bool = False,
+    dest_name: str,
+    label_field: str,
+    cfg: str,
+    persistent: bool = True,
+    overwrite: bool = False,
 ):
     """Create a new dataset by adding samples from multiple datasets.
 
@@ -356,9 +349,7 @@ def combine_datasets(
         a dataset instance
     """
     cfg = read_yaml(cfg)
-    assert "datasets" in cfg and isinstance(
-        dataset_cfg := cfg["datasets"], list
-    )
+    assert "datasets" in cfg and isinstance(dataset_cfg := cfg["datasets"], list)
     assert len(dataset_cfg) > 0
 
     dataset = create_fiftyone_dataset(
@@ -402,7 +393,9 @@ def fix_filepath(src: str, from_dir: str, to_dir: str) -> None:
     samples = read_json(src)
 
     to_dir = Path(to_dir)
-    fix_path = lambda path: str(to_dir / Path(path).relative_to(from_dir))
+
+    def fix_path(path):
+        return str(to_dir / Path(path).relative_to(from_dir))
 
     for smp in samples["samples"]:
         smp["filepath"] = fix_path(smp["filepath"])

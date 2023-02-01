@@ -10,7 +10,9 @@ from transformers import AutoTokenizer
 
 class TritonPythonModel:
     def initialize(self, args):
-        self.tokenizer = AutoTokenizer.from_pretrained("symanto/sn-xlm-roberta-base-snli-mnli-anli-xnli")
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            "symanto/sn-xlm-roberta-base-snli-mnli-anli-xnli"
+        )
 
     def execute(self, requests):
         responses = [self._process_request(one) for one in requests]
@@ -24,8 +26,6 @@ class TritonPythonModel:
         out = self.tokenizer(texts, padding=True, return_tensors="pt")
 
         input_ids = pb_utils.Tensor("input_ids", out["input_ids"])
-        attention_masks = pb_utils.Tensor("attention_mask",
-                                          out["attention_mask"])
-        resp = pb_utils.InferenceResponse(output_tensors=[input_ids,
-                                                          attention_masks])
+        attention_masks = pb_utils.Tensor("attention_mask", out["attention_mask"])
+        resp = pb_utils.InferenceResponse(output_tensors=[input_ids, attention_masks])
         return resp

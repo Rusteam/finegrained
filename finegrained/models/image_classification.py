@@ -5,27 +5,20 @@ from pathlib import Path
 from typing import Tuple
 
 import cv2
+import fiftyone as fo
+import fiftyone.utils.patches as foup
 import numpy as np
 import torch
-from PIL import Image
 from flash.core.data.utilities.classification import SingleLabelTargetFormatter
-from flash.image import (
-    ImageClassificationData,
-    ImageClassifier,
-)
-import fiftyone as fo
-import fiftyone.types as fot
-import fiftyone.utils.patches as foup
+from flash.image import ImageClassificationData, ImageClassifier
+from PIL import Image
 from torchvision import transforms as T
 from tqdm import tqdm
 
-from finegrained.utils.dataset import (
-    load_fiftyone_dataset,
-    get_unique_labels,
-)
 from finegrained.models.flash_base import FlashFiftyOneTask
 from finegrained.models.flash_transforms import get_transform
 from finegrained.utils import types
+from finegrained.utils.dataset import get_unique_labels, load_fiftyone_dataset
 from finegrained.utils.triton import TritonExporter
 
 
@@ -46,9 +39,7 @@ def parse_image_size(image_size: types.IMAGE_SIZE) -> Tuple[int, int]:
         ), f"if tuple/list should be 2 elements, got {image_size=}"
         return image_size
     else:
-        raise ValueError(
-            f"{image_size=} of type {type(image_size)} not understood"
-        )
+        raise ValueError(f"{image_size=} of type {type(image_size)} not understood")
 
 
 def _get_patch_array(patch_sample, patch_field, transpose=False) -> np.ndarray:
@@ -103,9 +94,7 @@ class ImageClassification(FlashFiftyOneTask, TritonExporter):
     ):
         dataset = load_fiftyone_dataset(dataset)
         dataset_tags = list(tags.values())
-        self.labels = get_unique_labels(
-            dataset.match_tags(dataset_tags), label_field
-        )
+        self.labels = get_unique_labels(dataset.match_tags(dataset_tags), label_field)
         self.data = ImageClassificationData.from_fiftyone(
             train_dataset=dataset.match_tags(tags["train"]),
             val_dataset=dataset.match_tags(tags["val"]),
@@ -174,9 +163,7 @@ class ImageClassification(FlashFiftyOneTask, TritonExporter):
         h, w = parse_image_size(image_size)
         return (torch.randn(2, 3, h, w),)
 
-    def _create_triton_config(
-        self, image_size: types.IMAGE_SIZE, **kwargs
-    ) -> dict:
+    def _create_triton_config(self, image_size: types.IMAGE_SIZE, **kwargs) -> dict:
         h, w = parse_image_size(image_size)
         return {
             "backend": "onnxruntime",
@@ -216,9 +203,7 @@ class ImageClassification(FlashFiftyOneTask, TritonExporter):
         return {
             "backend": "python",
             "max_batch_size": self.triton_batch_size,
-            "input": [
-                dict(name="IMAGE", dims=[-1, -1, 3], data_type="TYPE_UINT8")
-            ],
+            "input": [dict(name="IMAGE", dims=[-1, -1, 3], data_type="TYPE_UINT8")],
             "output": [
                 dict(
                     name="CLASS_PROBS",
@@ -243,9 +228,7 @@ class ImageClassification(FlashFiftyOneTask, TritonExporter):
         return {
             "platform": "ensemble",
             "max_batch_size": 1,
-            "input": [
-                dict(name="IMAGE", dims=[-1, -1, 3], data_type="TYPE_UINT8")
-            ],
+            "input": [dict(name="IMAGE", dims=[-1, -1, 3], data_type="TYPE_UINT8")],
             "output": [
                 dict(
                     name="CLASS_PROBS",

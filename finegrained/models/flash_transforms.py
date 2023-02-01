@@ -1,7 +1,7 @@
 """Extend Flash modules and classes.
 """
 from dataclasses import dataclass
-from typing import Tuple, Callable, Union
+from typing import Callable, Tuple, Union
 
 import torch
 import torchvision.transforms as T
@@ -11,8 +11,8 @@ from flash.image import ImageClassificationInputTransform
 
 @dataclass
 class RandAugmentTransform(InputTransform):
-    """Applies RandAugment transformation for input images.
-    """
+    """Applies RandAugment transformation for input images."""
+
     image_size: Tuple[int, int] = (224, 224)
     mean: Union[float, Tuple[float, float, float]] = (0.485, 0.456, 0.406)
     std: Union[float, Tuple[float, float, float]] = (0.229, 0.224, 0.225)

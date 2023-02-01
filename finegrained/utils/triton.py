@@ -7,8 +7,6 @@ from typing import List
 import torch
 from google.protobuf import json_format, text_format
 
-from finegrained.utils import types
-
 
 def save_triton_config(config: dict, write_file: str) -> None:
     """Dump dict config into protobuf file
@@ -91,9 +89,7 @@ class TritonExporter:
     def _create_triton_ensemble_config(self, *args, **kwargs):
         self.non_implemented()
 
-    def export_onnx(
-        self, model_path: str, write_path: str, **kwargs
-    ):
+    def export_onnx(self, model_path: str, write_path: str, **kwargs):
         """Create an ONNX model from a torch model.
 
         Args:
@@ -143,24 +139,20 @@ class TritonExporter:
 
         if ckpt_path is not None:
             if torchscript:
-                self.export_torchscirpt(write_path=model_version_dir / "model.pt", **kwargs)
-            else:
-                self.export_onnx(
-                    ckpt_path, model_version_dir / "model.onnx", **kwargs
+                self.export_torchscirpt(
+                    write_path=model_version_dir / "model.pt", **kwargs
                 )
+            else:
+                self.export_onnx(ckpt_path, model_version_dir / "model.onnx", **kwargs)
 
         if config := self._create_triton_config(torchscript=torchscript, **kwargs):
             write_config = model_version_dir.parent / "config.pbtxt"
             save_triton_config(config, write_config)
 
         if labels := self.triton_labels:
-            _export_txt_file(
-                labels, model_version_dir.parent / self.triton_labels_path
-            )
+            _export_txt_file(labels, model_version_dir.parent / self.triton_labels_path)
 
-        print(
-            f"Triton-onnx model has been exported to {str(model_version_dir.parent)}"
-        )
+        print(f"Triton-onnx model has been exported to {str(model_version_dir.parent)}")
 
     def export_triton_ensemble(
         self, triton_repo: str, triton_name: str, version: int = 1, **kwargs
@@ -171,9 +163,7 @@ class TritonExporter:
             write_config = model_version_dir.parent / "config.pbtxt"
             save_triton_config(config, write_config)
 
-        print(
-            f"Triton-ensemble has been exported to {str(model_version_dir.parent)}"
-        )
+        print(f"Triton-ensemble has been exported to {str(model_version_dir.parent)}")
 
     def export_triton_python(
         self, triton_repo: str, triton_name: str, version: int = 1, **kwargs

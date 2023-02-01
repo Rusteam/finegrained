@@ -1,15 +1,15 @@
 """Utilities to work with Milvus vector search.
 """
-import numpy as np
-from typing import Dict, Any, List
+from typing import Any, Dict, List
 
+import numpy as np
 from pymilvus import (
-    connections,
     Collection,
     CollectionSchema,
-    FieldSchema,
-    utility,
     DataType,
+    FieldSchema,
+    connections,
+    utility,
 )
 
 

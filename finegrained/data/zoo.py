@@ -1,17 +1,17 @@
 """Base constructs to use torchvision models.
 """
+import fiftyone as fo
 import torch
 from torchvision.io.image import read_image
-from torchvision.transforms import functional as T
 from torchvision.models.detection import (
-    maskrcnn_resnet50_fpn_v2,
     MaskRCNN_ResNet50_FPN_V2_Weights,
+    maskrcnn_resnet50_fpn_v2,
 )
-import fiftyone as fo
+from torchvision.transforms import functional as T
 from tqdm import tqdm
 
-from finegrained.utils.dataset import load_fiftyone_dataset
 from finegrained.models.torch_utils import get_device
+from finegrained.utils.dataset import load_fiftyone_dataset
 
 
 def _parse_bbox(box, image_size):

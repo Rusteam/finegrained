@@ -9,7 +9,7 @@ import onnx
 
 from finegrained.utils import mlflow_server
 from finegrained.utils.mlflow_server import get_tensorboard_files
-from finegrained.utils.os_utils import read_yaml, read_file_config
+from finegrained.utils.os_utils import read_file_config, read_yaml
 
 
 def log_events(path: str | list) -> None:
@@ -82,7 +82,8 @@ def log_run(
         log_dir: provide path to tensorboard log dir in order to automatically
             get events, hparams and ckpt paths.
         tracking_uri: mlflow tracking uri
-        experiment_name: if set, use this experiment name (if does not exist, creates a new one)
+        experiment_name: if set, use this experiment name
+            (if does not exist, creates a new one)
         artifact_location: set artifact location for this experiment
                             (applicable only when a new experiment created)
         env: path to a file with environment variables for MLflow S3
@@ -92,9 +93,11 @@ def log_run(
     """
     assert log_dir or events, "Either log_dir or events must be specified"
 
-    mlflow_server.connect_to_mlflow(tracking_uri,
-                                    experiment_name=experiment_name,
-                                    artifact_location=artifact_location)
+    mlflow_server.connect_to_mlflow(
+        tracking_uri,
+        experiment_name=experiment_name,
+        artifact_location=artifact_location,
+    )
     if env:
         env = read_file_config(env)
         for k, v in env.items():

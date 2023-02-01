@@ -28,8 +28,14 @@ def test_index(setup):
     ]
     milvus.create_collection(name, fields, "Test collection to be deleted")
     data = [
-        [" ".join(random.sample("This is a question sample".split(), k=3)) for _ in range(n_samples)],
-        [" ".join(random.sample("This will be an answer examples".split(), k=3)) for _ in range(n_samples)],
+        [
+            " ".join(random.sample("This is a question sample".split(), k=3))
+            for _ in range(n_samples)
+        ],
+        [
+            " ".join(random.sample("This will be an answer examples".split(), k=3))
+            for _ in range(n_samples)
+        ],
         [np.random.rand(n_dim) for _ in range(n_samples)],
     ]
 

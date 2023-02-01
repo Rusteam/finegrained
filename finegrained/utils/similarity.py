@@ -2,7 +2,7 @@
 """
 from copy import deepcopy
 from dataclasses import dataclass
-from typing import List, Dict
+from typing import Dict, List
 
 import numpy as np
 from scipy.spatial.distance import cdist
@@ -28,8 +28,6 @@ class SimilaritySearch:
         d.update(dict(distance=distance))
         return d
 
-    def embed_and_find_similar(
-        self, query: str, model: SentenceEmbeddings, **kwargs
-    ):
+    def embed_and_find_similar(self, query: str, model: SentenceEmbeddings, **kwargs):
         query_embed = model.embed(query).numpy()
         return self.find_similar(query_embed, **kwargs)

@@ -3,38 +3,21 @@
 from pathlib import Path
 
 import numpy as np
-
 import triton_python_backend_utils as pb_utils
 
 
 def _read_names(repo) -> dict:
     names = (Path(repo) / "names.txt").read_text().strip().split("\n")
-    names = {
-        one.split('=')[0]: one.split('=')[1]
-        for one in names
-    }
+    names = {one.split("=")[0]: one.split("=")[1] for one in names}
     return names
 
 
 # TODO unable to send batched requests with varying sizes
 class TritonPythonModel:
-
     @staticmethod
     def auto_complete_config(auto_complete_model_config):
-        inputs = [
-            dict(
-                name="IMAGE",
-                dims=[-1, -1, 3],
-                data_type="TYPE_UINT8"
-            )
-        ]
-        outputs = [
-            dict(
-                name="CLASS_PROBS",
-                dims=[-1],
-                data_type="TYPE_FP32"
-            )
-        ]
+        inputs = [dict(name="IMAGE", dims=[-1, -1, 3], data_type="TYPE_UINT8")]
+        outputs = [dict(name="CLASS_PROBS", dims=[-1], data_type="TYPE_FP32")]
 
         config = auto_complete_model_config.as_dict()
         existing_inputs = [inp["name"] for inp in config["input"]]
@@ -74,7 +57,7 @@ class TritonPythonModel:
         request = pb_utils.InferenceRequest(
             model_name=self._names["preprocessing"],
             requested_output_names=["output"],
-            inputs=[pb_utils.Tensor("image", images)]
+            inputs=[pb_utils.Tensor("image", images)],
         )
         resp = request.exec()
         self._raise_for_error(resp)
@@ -86,7 +69,7 @@ class TritonPythonModel:
         request = pb_utils.InferenceRequest(
             model_name=self._names["classifier"],
             requested_output_names=["output"],
-            inputs=[pb_utils.Tensor("image", images)]
+            inputs=[pb_utils.Tensor("image", images)],
         )
         resp = request.exec()
         self._raise_for_error(resp)
@@ -98,5 +81,4 @@ class TritonPythonModel:
 
     def _raise_for_error(self, inference_response):
         if inference_response.has_error():
-            raise pb_utils.TritonModelException(
-                inference_response.error().message())
+            raise pb_utils.TritonModelException(inference_response.error().message())

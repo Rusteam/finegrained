@@ -7,10 +7,8 @@ from fiftyone.utils import random as four
 from sklearn.model_selection import train_test_split
 
 from finegrained.data.display import label_diff
-from finegrained.utils.dataset import (
-    load_fiftyone_dataset,
-)
 from finegrained.utils import types
+from finegrained.utils.dataset import load_fiftyone_dataset
 from finegrained.utils.general import parse_list_str
 
 
@@ -74,15 +72,11 @@ def split_classes(
     """
     dataset = load_fiftyone_dataset(dataset)
     label_counts = dataset.count_values(f"{label_field}.label")
-    labels = list(
-        filter(lambda x: label_counts[x] >= min_samples, label_counts)
-    )
+    labels = list(filter(lambda x: label_counts[x] >= min_samples, label_counts))
     train_labels, val_labels = train_test_split(
         labels, test_size=val_size, train_size=train_size, shuffle=True
     )
-    train_view = dataset.filter_labels(
-        label_field, F("label").is_in(train_labels)
-    )
+    train_view = dataset.filter_labels(label_field, F("label").is_in(train_labels))
     train_view.tag_samples("train")
     val_view = dataset.filter_labels(label_field, F("label").is_in(val_labels))
     val_view.tag_samples("val")
@@ -135,14 +129,10 @@ def retag_missing_labels(
         a count of sample tags for a subset
     """
     # TODO test this
-    diff = label_diff(
-        dataset, label_field, tags_left=from_tags, tags_right=to_tags
-    )
+    diff = label_diff(dataset, label_field, tags_left=from_tags, tags_right=to_tags)
     assert len(diff) > 0, "No samples to retag"
 
-    dataset = load_fiftyone_dataset(
-        dataset, include_labels={label_field: diff}
-    )
+    dataset = load_fiftyone_dataset(dataset, include_labels={label_field: diff})
     dataset.untag_samples(from_tags)
     dataset.tag_samples(to_tags)
 

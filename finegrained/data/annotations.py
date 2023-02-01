@@ -1,11 +1,11 @@
 """Send, query and get annotation results.
 """
 from pathlib import Path
-from typing import Optional, Any
+from typing import Any, Optional
 
 from ..utils import types
 from ..utils.dataset import load_fiftyone_dataset
-from ..utils.os_utils import read_txt, read_file_config
+from ..utils.os_utils import read_file_config, read_txt
 
 
 def _load_backend_config(src: Any) -> dict:
@@ -26,7 +26,8 @@ def _parse_classes(src: Any) -> list[str]:
         return read_txt(src)
     else:
         raise ValueError(
-            f"Classes has to be a list of str or a path to a txt file. Received {type(src)}"
+            "Classes has to be a list of str or a path to a txt file."
+            f"Received {type(src)}"
         )
 
 
@@ -93,9 +94,7 @@ def load(
     dataset = load_fiftyone_dataset(
         dataset, **dataset_kwargs if bool(dataset_kwargs) else {}
     )
-    dataset.load_annotations(
-        annotation_key, dest_field=dest_field, **backend_conf
-    )
+    dataset.load_annotations(annotation_key, dest_field=dest_field, **backend_conf)
 
 
 def list_keys(dataset: str) -> types.LIST_STR:

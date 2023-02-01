@@ -156,8 +156,5 @@ def get_all_filepaths(dataset: fo.Dataset) -> types.LIST_STR:
     Returns:
         a list of absolute paths
     """
-    files = [
-        smp.filepath
-        for smp in dataset.select_fields("filepath")
-    ]
+    files = [smp.filepath for smp in dataset.select_fields("filepath")]
     return files

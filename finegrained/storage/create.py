@@ -1,7 +1,7 @@
 """Create tables/collections in a DB.
 """
 from pathlib import Path
-from typing import List, Dict, Any, Union
+from typing import Any, Dict, List, Union
 
 import fire
 

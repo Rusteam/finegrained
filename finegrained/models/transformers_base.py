@@ -4,11 +4,11 @@ import shutil
 from pathlib import Path
 
 import torch
-from transformers import AutoTokenizer, AutoModel
+from transformers import AutoModel, AutoTokenizer
 
 from finegrained.models import torch_utils
-from finegrained.utils.triton import save_triton_config, init_model_repo
 from finegrained.utils import types
+from finegrained.utils.triton import init_model_repo, save_triton_config
 
 
 class MeanPooling(torch.nn.Module):
@@ -24,9 +24,9 @@ class MeanPooling(torch.nn.Module):
             token_embeddings[0, 0, :].greater_equal(-1e6).sum(),
         ]
         input_mask_expanded = attention_mask.unsqueeze(-1).expand(sizes)
-        return torch.sum(
-            token_embeddings * input_mask_expanded, 1
-        ) / torch.clamp(input_mask_expanded.sum(1), min=1e-9)
+        return torch.sum(token_embeddings * input_mask_expanded, 1) / torch.clamp(
+            input_mask_expanded.sum(1), min=1e-9
+        )
 
 
 class TransformersBase:
@@ -39,9 +39,7 @@ class TransformersBase:
         self.device = device
         self._tokenizer = AutoTokenizer.from_pretrained(model_name)
         self._model = AutoModel.from_pretrained(model_name).to(device)
-        self.embedding_dim = (
-            self._model.embeddings.token_type_embeddings.embedding_dim
-        )
+        self.embedding_dim = self._model.embeddings.token_type_embeddings.embedding_dim
         self.model_name = model_name
         self._batch_size = batch_size
 
@@ -79,9 +77,7 @@ class SentenceEmbeddings(TransformersBase):
     @torch.no_grad()
     def model(self, tokens: dict) -> torch.Tensor:
         model_output = self._model(**tokens)
-        embeddings = MeanPooling().forward(
-            model_output, tokens["attention_mask"]
-        )
+        embeddings = MeanPooling().forward(model_output, tokens["attention_mask"])
         return embeddings
 
     def predict(self, questions):
@@ -124,7 +120,7 @@ class SentenceEmbeddings(TransformersBase):
 
         """
         # TODO finish with this
-        model = SentenceEmbeddingsModel(self._model.to("cpu"))
+        # model = SentenceEmbeddingsModel(self._model.to("cpu"))
         dummy_tokens = self.generate_dummy_input()
         torch.onnx.export(
             self._model,
@@ -137,9 +133,7 @@ class SentenceEmbeddings(TransformersBase):
             opset_version=13,
         )
 
-    def export_triton(
-        self, triton_repo: str, triton_name: str, version: int = 1
-    ):
+    def export_triton(self, triton_repo: str, triton_name: str, version: int = 1):
         model_version_dir = init_model_repo(triton_repo, triton_name, version)
         self.export_onnx(model_version_dir / "model.onnx")
 

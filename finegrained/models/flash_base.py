@@ -4,14 +4,14 @@ import itertools
 from itertools import chain
 from typing import Tuple
 
+import fiftyone as fo
 import torch
 from flash import Trainer
 from flash.core.classification import FiftyOneLabelsOutput
 from tqdm import tqdm
-import fiftyone as fo
 
-from finegrained.utils.dataset import load_fiftyone_dataset
 from finegrained.models.torch_utils import get_device
+from finegrained.utils.dataset import load_fiftyone_dataset
 from finegrained.utils.os_utils import read_yaml
 
 
@@ -26,8 +26,7 @@ def _map_classifications_to_detections(predictions, patches, patch_field) -> dic
         paired.append((detection, smp.sample_id))
 
     detections = {}
-    key_fn = lambda x: x[1]
-    for key, group in itertools.groupby(paired, key_fn):
+    for key, group in itertools.groupby(paired, lambda x: x[1]):
         detections[key] = fo.Detections(detections=[d for d, _ in group])
     return detections
 
@@ -109,9 +108,7 @@ class FlashFiftyOneTask:
         return dataset
 
     @staticmethod
-    def calculate_features(
-            model, dataloader
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+    def calculate_features(model, dataloader) -> Tuple[torch.Tensor, torch.Tensor]:
         """Extract embeddings for all samples in a dataloader
 
         Args:
@@ -152,8 +149,8 @@ class FlashFiftyOneTask:
         raise NotImplementedError("Subclass has to implement this method")
 
     def _finetune(self, epochs: int, **kwargs):
-        assert self.model is not None, f"make sure a model is initialized"
-        assert self.data is not None, f"make sure a datamodule is initialized"
+        assert self.model is not None, "make sure a model is initialized"
+        assert self.data is not None, "make sure a datamodule is initialized"
 
         device, device_count = get_device(kwargs.get("device"))
         trainer = Trainer(
@@ -176,7 +173,7 @@ class FlashFiftyOneTask:
 
         trainer.save_checkpoint(kwargs.get("save_checkpoint", "model.pt"))
 
-        if (test_loader := self.data.test_dataloader()):
+        if test_loader := self.data.test_dataloader():
             trainer.test(dataloaders=test_loader)
 
     def _predict(self):
@@ -185,9 +182,7 @@ class FlashFiftyOneTask:
         predictions = trainer.predict(
             self.model,
             datamodule=self.data,
-            output=FiftyOneLabelsOutput(
-                self.model.labels, return_filepath=False
-            ),
+            output=FiftyOneLabelsOutput(self.model.labels, return_filepath=False),
         )
         predictions = list(chain.from_iterable(predictions))
         return predictions
@@ -205,14 +200,14 @@ class FlashFiftyOneTask:
         self._finetune(**cfg["trainer"])
 
     def predict(
-            self,
-            dataset: str,
-            label_field: str,
-            ckpt_path: str,
-            image_size: Tuple[int, int] = (224, 224),
-            batch_size: int = 4,
-            patch_field: str = None,
-            **kwargs,
+        self,
+        dataset: str,
+        label_field: str,
+        ckpt_path: str,
+        image_size: Tuple[int, int] = (224, 224),
+        batch_size: int = 4,
+        patch_field: str = None,
+        **kwargs,
     ):
         """Classify samples from a dataset and assign values to label field
 
@@ -229,12 +224,15 @@ class FlashFiftyOneTask:
             none
         """
         self._init_prediction_datamodule(
-            dataset, image_size=image_size, batch_size=batch_size,
-            patch_field=patch_field, **kwargs
+            dataset,
+            image_size=image_size,
+            batch_size=batch_size,
+            patch_field=patch_field,
+            **kwargs,
         )
         assert (
-                self.prediction_dataset is not None
-        ), f"Make sure _init_prediction_datamodule() creates self.prediction_dataset"
+            self.prediction_dataset is not None
+        ), "Make sure _init_prediction_datamodule() creates self.prediction_dataset"
         self._load_pretrained_model(ckpt_path)
         predictions = self._predict()
         if bool(patch_field):
@@ -244,7 +242,13 @@ class FlashFiftyOneTask:
                 detections = []
                 for det in smp[patch_field].detections:
                     clf = self.patch_dataset[det.patch_filepath][label_field]
-                    detections.append(fo.Detection(label=clf.label, bounding_box=det.bounding_box, confidence=clf.confidence))
+                    detections.append(
+                        fo.Detection(
+                            label=clf.label,
+                            bounding_box=det.bounding_box,
+                            confidence=clf.confidence,
+                        )
+                    )
 
                 smp[label_field] = fo.Detections(detections=detections)
                 smp.save()

@@ -1,24 +1,23 @@
 """Test ONNX and Triton export.
 """
-from pathlib import Path
 from typing import List
 
-import onnx
-import pytest
 import fiftyone as fo
 import fiftyone.zoo as foz
+import onnx
+import pytest
 import torch
-from flash.image import ImageClassifier
 from flash import Trainer
+from flash.image import ImageClassifier
 from onnxruntime import InferenceSession
 from transformers.utils import to_numpy
 
 from finegrained.models import ImageClassification, ImageTransform
 from finegrained.models.image_classification import SoftmaxClassifier
 from finegrained.models.yolo import (
-    YOLOv5Preprocessing,
-    YOLOv5Postprocessing,
     YOLOv5Model,
+    YOLOv5Postprocessing,
+    YOLOv5Preprocessing,
 )
 
 
@@ -26,9 +25,7 @@ from finegrained.models.yolo import (
 def clf_dataset():
     if fo.dataset_exists("train_test_temp"):
         fo.delete_dataset("train_test_temp")
-    dataset = (
-        foz.load_zoo_dataset("quickstart").take(100).clone("train_test_temp")
-    )
+    dataset = foz.load_zoo_dataset("quickstart").take(100).clone("train_test_temp")
     yield dataset
     fo.delete_dataset(dataset.name)
 
@@ -171,18 +168,14 @@ def test_yolov5_post(triton_repo, torchscript):
 
     dummy = v5_post.generate_dummy_inputs()
     ext = ".pt" if torchscript else ".onnx"
-    _verify_model_outputs(
-        v5_post, str(triton_model_path / "1" / f"model{ext}"), dummy
-    )
+    _verify_model_outputs(v5_post, str(triton_model_path / "1" / f"model{ext}"), dummy)
 
 
 def _verify_model_outputs(
     model: torch.nn.Module, exported_path: str, dummy: List[torch.Tensor]
 ):
     if exported_path.endswith(".onnx"):
-        ort = InferenceSession(
-            exported_path, providers=["CPUExecutionProvider"]
-        )
+        ort = InferenceSession(exported_path, providers=["CPUExecutionProvider"])
         input_names = [inp.name for inp in ort.get_inputs()]
         output_names = [out.name for out in ort.get_outputs()]
         input_feed = {k: to_numpy(v) for k, v in zip(input_names, dummy)}

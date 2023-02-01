@@ -1,7 +1,7 @@
 """MLflow and Tensorboard utils.
 """
-from typing import Optional
 from pathlib import Path
+from typing import Optional
 
 import mlflow
 import pandas as pd
@@ -19,7 +19,6 @@ def read_tensorboard_scalars(events: str) -> SCALAR_TYPE:
     Returns:
          a dict of scalar events.
     """
-    # refer to https://stackoverflow.com/questions/41074688/how-do-you-read-tensorboard-files-programmatically
     scalars = {}
     events = str(events) if isinstance(events, Path) else events
     event_acc = event_accumulator.EventAccumulator(events)
@@ -63,15 +62,17 @@ def parse_tensorboard_scalars(scalars: SCALAR_TYPE) -> list[dict]:
     epoch = sorted(list(set(_get_scalar_values(scalars, tag="epoch"))))
     epoch = list(map(int, epoch))
 
-    df = pd.DataFrame({
-        "train_accuracy": train_accuracy,
-        "train_cross_entropy": train_ce,
-        "val_accuracy": val_accuracy,
-        "val_cross_entropy": val_ce,
-        "test_accuracy": test_accuracy,
-        "test_cross_entropy": test_ce,
-        "epoch": epoch
-    })
+    df = pd.DataFrame(
+        {
+            "train_accuracy": train_accuracy,
+            "train_cross_entropy": train_ce,
+            "val_accuracy": val_accuracy,
+            "val_cross_entropy": val_ce,
+            "test_accuracy": test_accuracy,
+            "test_cross_entropy": test_ce,
+            "epoch": epoch,
+        }
+    )
     cols = df.columns[df.isnull().sum(0) == 0]
     parsed = df[cols].to_dict("records")
 
@@ -113,7 +114,7 @@ def get_tensorboard_files(path: str) -> tuple[list[Path], Path, Path]:
     path = Path(path)
 
     events = list(path.glob("events.*"))
-    assert len(events) > 0, f"Expected at least one event file"
+    assert len(events) > 0, "Expected at least one event file"
 
     hparams = path / "hparams.yaml"
     assert hparams.exists(), f"{hparams=} does not exist."

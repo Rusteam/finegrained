@@ -5,19 +5,12 @@ from typing import Tuple
 import fiftyone.core.labels as fol
 from fiftyone import Dataset
 from flash import DataModule
-from flash.image import (
-    ImageClassificationData,
-    ImageClassifier,
-)
+from flash.image import ImageClassificationData, ImageClassifier
 
-from finegrained.utils.dataset import (
-    load_fiftyone_dataset,
-    get_all_filepaths,
-)
 from finegrained.models.flash_base import FlashFiftyOneTask
 from finegrained.models.flash_transforms import get_transform
 from finegrained.utils import types
-
+from finegrained.utils.dataset import get_all_filepaths, load_fiftyone_dataset
 
 # TODO turn into a class
 # TODO split before training
@@ -144,16 +137,14 @@ class ImageMetalearn(FlashFiftyOneTask):
             self.model, self.query_data.predict_dataloader()
         )
 
-        clf = PrototypicalClassifier(
-            support=support_features, labels=support_labels
-        )
+        clf = PrototypicalClassifier(support=support_features, labels=support_labels)
         dist = clf(query_features)
         class_probs = dist.softmax(dim=1)
         conf, index = class_probs.max(dim=1)
 
-        _get_class_label = (
-            lambda index: self.support_data.train_dataset.labels[index]
-        )
+        def _get_class_label(index):
+            return self.support_data.train_dataset.labels[index]
+
         predictions = [
             fol.Classification(
                 label=_get_class_label(i.item()),
@@ -187,9 +178,8 @@ class ImageMetalearn(FlashFiftyOneTask):
             ckpt_path: flash model checkpoint path
             image_size: Image size for inference
             batch_size: predictions batch size
-
-        Returns:
-            none
+            support_kwargs: support dataset filters
+            query_kwargs: query dataset filters
         """
         self._init_prediction_datamodule(
             support_dataset=support_dataset,
@@ -204,5 +194,6 @@ class ImageMetalearn(FlashFiftyOneTask):
         predictions = self._predict()
         self.prediction_dataset.set_values(query_label_field, predictions)
         print(
-            f"{len(predictions)} predictions saved to {query_label_field} field in {query_dataset}"
+            f"{len(predictions)} predictions saved to "
+            f"{query_label_field} field in {query_dataset}"
         )

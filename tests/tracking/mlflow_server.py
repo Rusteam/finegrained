@@ -1,14 +1,12 @@
 from pathlib import Path
 
-import pytest
 import mlflow
+import pytest
 import torch
 
-import finegrained.utils.mlflow_server
 from finegrained.services import tracking
 from finegrained.utils import mlflow_server
 from finegrained.utils.os_utils import read_yaml
-
 
 TENSORBOARD_FOLDER = Path(__file__).parents[1] / "files/tensorboard"
 EVENTS = [
@@ -53,18 +51,23 @@ def test_read_tensorboard_scalars(file):
 
     parsed = mlflow_server.parse_tensorboard_scalars(scalars)
     for step in parsed:
-        for key in ["train_accuracy", "val_accuracy", "test_accuracy",
-                    "train_cross_entropy", "val_cross_entropy", "test_cross_entropy",
-                    "epoch"]:
+        for key in [
+            "train_accuracy",
+            "val_accuracy",
+            "test_accuracy",
+            "train_cross_entropy",
+            "val_cross_entropy",
+            "test_cross_entropy",
+            "epoch",
+        ]:
             if key in step:
                 assert isinstance(step[key], float)
 
 
 def test_get_tensorboard_files(tfevents):
-    files = mlflow_server.get_tensorboard_files(str(
-        Path(__file__).parents[1]
-        / "files/tensorboard"
-    ))
+    files = mlflow_server.get_tensorboard_files(
+        str(Path(__file__).parents[1] / "files/tensorboard")
+    )
     assert len(files) == 3
 
     events, hparams, ckpt = files
@@ -135,7 +138,9 @@ def test_log_run(mlflow_tracking, tfevents, onnx_model, tmp_path):
     # checkpoint
     ckpt_path = tmp_path / "checkpoints" / ckpt.name
     assert "checkpoints" in artifact_paths
-    client.download_artifacts(run_id, path=f"checkpoints/{ckpt.name}", dst_path=tmp_path)
+    client.download_artifacts(
+        run_id, path=f"checkpoints/{ckpt.name}", dst_path=tmp_path
+    )
     actual_keys = torch.load(ckpt_path).keys()
     expected_keys = torch.load(ckpt).keys()
     assert actual_keys == expected_keys
