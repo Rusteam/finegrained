@@ -14,11 +14,12 @@ from finegrained.utils.dataset import get_unique_labels
 from finegrained.utils.os_utils import read_yaml, write_yaml
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="session")
 def clf_dataset():
     if fo.dataset_exists("train_test_temp"):
         fo.delete_dataset("train_test_temp")
     dataset = foz.load_zoo_dataset("quickstart").take(100).clone("train_test_temp")
+    four.random_split(dataset, {"train": 0.7, "val": 0.1, "test": 0.2})
     yield dataset
     fo.delete_dataset(dataset.name)
 
@@ -47,10 +48,7 @@ def clf_config(clf_dataset, tmp_path):
             device="cpu",
         ),
     )
-    write_yaml(cfg, cfg_path)
-
-    clf_dataset.tags = []
-    four.random_split(clf_dataset, {"train": 0.7, "val": 0.1, "test": 0.2})
+    write_yaml(cfg, str(cfg_path))
 
     yield cfg_path, model_path, clf_dataset
     cfg_path.unlink(False)
@@ -60,7 +58,7 @@ def clf_config(clf_dataset, tmp_path):
 def test_classification_finetune(clf_config, tmp_path):
     cfg, model_path, dataset = clf_config
     img_clf = ImageClassification()
-    img_clf.finetune(cfg)
+    img_clf.finetune(str(cfg))
     assert model_path.exists()
 
     img_clf.predict(
@@ -141,7 +139,7 @@ def meta_learn_cfg(clf_dataset, tmp_path):
             device="cpu",
         ),
     )
-    write_yaml(cfg, cfg_path)
+    write_yaml(cfg, str(cfg_path))
 
     yield cfg_path, model_path, label_field
     cfg_path.unlink(False)
@@ -179,15 +177,16 @@ def selfsupervised_config(clf_dataset, tmp_path):
     cfg = dict(
         data=dict(
             dataset=clf_dataset.name,
+            label_field="ground_truth",
             batch_size=2,
             transform_kwargs=dict(image_size=(224, 112)),
         ),
         model=dict(
             backbone="vision_transformer",
             pretrained=True,
-            training_strategy="simclr",
-            head="simclr_head",
-            pretraining_transform="simclr_transform",
+            training_strategy="barlow_twins",
+            head="barlow_twins_head",
+            pretraining_transform="barlow_twins_transform",
         ),
         trainer=dict(
             epochs=2,
@@ -197,7 +196,7 @@ def selfsupervised_config(clf_dataset, tmp_path):
             device="cpu",
         ),
     )
-    write_yaml(cfg, cfg_path)
+    write_yaml(cfg, str(cfg_path))
     yield cfg_path, model_path
     cfg_path.unlink(False)
     model_path.unlink(True)
@@ -206,5 +205,5 @@ def selfsupervised_config(clf_dataset, tmp_path):
 def test_selfsupervised_finetune(selfsupervised_config):
     cfg_path, model_path = selfsupervised_config
     img_emb = ImageSelfSupervised()
-    img_emb.finetune(cfg_path)
+    img_emb.finetune(str(cfg_path))
     assert model_path.exists()

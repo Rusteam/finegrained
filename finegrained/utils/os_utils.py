@@ -48,7 +48,7 @@ def read_ini_credentials(
         return parser
 
 
-def read_yaml(path: str):
+def read_yaml(path: str | Path):
     with open(path, "r") as f:
         data = yaml.safe_load(f)
     return data

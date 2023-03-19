@@ -53,9 +53,7 @@ class ImageMetalearn(FlashFiftyOneTask):
     def model_keys(self):
         return ["backbone", "training_strategy", "training_strategy_kwargs"]
 
-    def _init_training_datamodule(
-        self, dataset: str, label_field: str, **kwargs
-    ) -> Tuple[DataModule, types.LIST_STR]:
+    def _init_training_datamodule(self, dataset: str, label_field: str, **kwargs):
         dataset = load_fiftyone_dataset(dataset)
         self.labels = dataset.match_tags(["train", "val"]).distinct(
             f"{label_field}.label"
@@ -114,7 +112,7 @@ class ImageMetalearn(FlashFiftyOneTask):
         training_strategy: str,
         training_strategy_kwargs: dict,
         **kwargs,
-    ) -> ImageClassifier:
+    ):
         self.model = ImageClassifier(
             num_classes=len(self.labels),
             backbone=backbone,

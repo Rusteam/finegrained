@@ -2,6 +2,7 @@
 """
 import itertools
 from itertools import chain
+from pathlib import Path
 from typing import Tuple
 
 import fiftyone as fo
@@ -187,7 +188,7 @@ class FlashFiftyOneTask:
         predictions = list(chain.from_iterable(predictions))
         return predictions
 
-    def finetune(self, cfg: str):
+    def finetune(self, cfg: str | Path):
         """Fine-tune model with given data
 
         Args:

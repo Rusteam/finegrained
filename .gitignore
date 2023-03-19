@@ -24,7 +24,6 @@ coverage.xml
 # mkdocs documentation
 /site
 
-
 # cache and locks
 .mypy_cache/
 .ipynb_checkpoints
@@ -36,3 +35,6 @@ poetry.lock
 .spyderproject
 .spyproject
 .DS_Store
+
+# logs
+lightning_logs/
