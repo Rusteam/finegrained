@@ -1,0 +1,7 @@
+site_name: Finegrained
+site_description: Fine-grained image classification
+theme: readthedocs
+plugins:
+  - search
+  - mkdocstrings
+  - include-markdown
