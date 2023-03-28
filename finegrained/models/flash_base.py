@@ -119,7 +119,7 @@ class FlashFiftyOneTask:
         Returns:
             a tuple with features and labels if present
         """
-        feature_extractor = model.adapter.backbone.eval()
+        feature_extractor = model.eval()
         features = []
         labels = []
 
@@ -174,7 +174,9 @@ class FlashFiftyOneTask:
 
         trainer.save_checkpoint(kwargs.get("save_checkpoint", "model.pt"))
 
-        if test_loader := self.data.test_dataloader():
+        if hasattr(self, "test_dataset") and (
+            test_loader := self.data.test_dataloader()
+        ):
             trainer.test(dataloaders=test_loader)
 
     def _predict(self):

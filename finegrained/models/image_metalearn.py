@@ -22,7 +22,7 @@ def _init_support_datamodule(
     image_size: Tuple[int, int],
     batch_size: int = 4,
     **kwargs,
-) -> Tuple[DataModule, Dataset]:
+) -> DataModule:
     dataset = load_fiftyone_dataset(dataset, **kwargs)
 
     data = ImageClassificationData.from_fiftyone(
@@ -55,7 +55,7 @@ class ImageMetalearn(FlashFiftyOneTask):
 
     def _init_training_datamodule(self, dataset: str, label_field: str, **kwargs):
         dataset = load_fiftyone_dataset(dataset)
-        self.labels = dataset.match_tags(["train", "val"]).distinct(
+        self.labels = dataset.match_tags(["train_metalearn", "val_metalearn"]).distinct(
             f"{label_field}.label"
         )
 
@@ -66,10 +66,10 @@ class ImageMetalearn(FlashFiftyOneTask):
             ]
             return targets
 
-        train_files = get_all_filepaths(dataset.match_tags("train"))
-        train_targets = get_targets("train")
-        val_files = get_all_filepaths(dataset.match_tags("val"))
-        val_targets = get_targets("val")
+        train_files = get_all_filepaths(dataset.match_tags("train_metalearn"))
+        train_targets = get_targets("train_metalearn")
+        val_files = get_all_filepaths(dataset.match_tags("val_metalearn"))
+        val_targets = get_targets("val_metalearn")
 
         # use from_files because of label mapping error with from_fiftyone
         self.data = ImageClassificationData.from_files(
@@ -122,17 +122,18 @@ class ImageMetalearn(FlashFiftyOneTask):
             **kwargs,
         )
 
-    def _load_pretrained_model(self, ckpt_path: str) -> ImageClassifier:
+    def _load_pretrained_model(self, ckpt_path: str):
         self.model = ImageClassifier.load_from_checkpoint(ckpt_path)
 
     def _predict(self):
         from learn2learn.nn import PrototypicalClassifier
 
+        feature_extractor = self.model.backbone
         support_features, support_labels = self.calculate_features(
-            self.model, self.support_data.train_dataloader()
+            feature_extractor, self.support_data.train_dataloader()
         )
         query_features, _ = self.calculate_features(
-            self.model, self.query_data.predict_dataloader()
+            feature_extractor, self.query_data.predict_dataloader()
         )
 
         clf = PrototypicalClassifier(support=support_features, labels=support_labels)
@@ -195,3 +196,6 @@ class ImageMetalearn(FlashFiftyOneTask):
             f"{len(predictions)} predictions saved to "
             f"{query_label_field} field in {query_dataset}"
         )
+
+    def _get_available_backbones(self):
+        return ImageClassifier.available_backbones()

@@ -18,7 +18,7 @@ def load_fiftyone_dataset(
     fields_exist: LIST_STR = None,
     not_exist: LIST_STR = None,
     label_tags: LIST_STR = None,
-) -> fo.DatasetView:
+) -> fo.DatasetView | fo.Dataset:
     """Load a dataset and apply view filters
 
     Args:

@@ -54,6 +54,8 @@ def split_classes(
     train_size: float = 0.5,
     val_size: float = 0.5,
     min_samples: int = 3,
+    split_names: tuple[str, str] = ("train", "val"),
+    overwrite: bool = False,
 ) -> types.DICT_STR_FLOAT:
     """Split classes in a dataset into train and val.
 
@@ -66,6 +68,8 @@ def split_classes(
         val_size: fraction of classes to tag as val
         min_samples: minimum number of samples
             per class to include a class into a split
+        split_names: splits will be tagged with these names
+        overwrite: if True, existing tags are removed
 
     Returns:
         a dict of tag counts
@@ -76,10 +80,12 @@ def split_classes(
     train_labels, val_labels = train_test_split(
         labels, test_size=val_size, train_size=train_size, shuffle=True
     )
+    if overwrite:
+        dataset.untag_samples(split_names)
     train_view = dataset.filter_labels(label_field, F("label").is_in(train_labels))
-    train_view.tag_samples("train")
+    train_view.tag_samples(split_names[0])
     val_view = dataset.filter_labels(label_field, F("label").is_in(val_labels))
-    val_view.tag_samples("val")
+    val_view.tag_samples(split_names[1])
     return dataset.count_sample_tags()
 
 

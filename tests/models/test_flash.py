@@ -10,7 +10,6 @@ import pytest
 from finegrained.data.brain import compute_hardness
 from finegrained.data.tag import split_classes, split_dataset
 from finegrained.models import ImageClassification, ImageMetalearn, ImageSelfSupervised
-from finegrained.utils.dataset import get_unique_labels
 from finegrained.utils.os_utils import read_yaml, write_yaml
 
 
@@ -94,38 +93,36 @@ def meta_learn_cfg(clf_dataset, tmp_path):
     cfg_path = Path(tmp_path) / "meta_learn.yaml"
     model_path = Path(tmp_path) / "meta_learn.pt"
 
-    label_field = "resnet50"
-    clf_dataset.tags = []
+    meta_learn_dataset = clf_dataset.clone(clf_dataset.name + "_meta_learn")
+    label_field = "resnet18-imagenet-torch"
     split_classes(
-        clf_dataset.name,
+        meta_learn_dataset.name,
         label_field,
         train_size=0.5,
         val_size=0.5,
         min_samples=3,
+        overwrite=True,
+        split_names=("train_metalearn", "val_metalearn"),
     )
 
     cfg = dict(
         data=dict(
-            dataset=clf_dataset.name,
+            dataset=meta_learn_dataset.name,
             label_field=label_field,
             batch_size=2,
             transform_kwargs={"image_size": (224, 224)},
         ),
         model=dict(
-            backbone="efficientnet_b0",
+            backbone="mobilenetv3_rw",
             training_strategy="prototypicalnetworks",
             training_strategy_kwargs=dict(
-                ways=len(
-                    get_unique_labels(clf_dataset.match_tags("train"), label_field)
-                ),
+                ways=2,
                 meta_batch_size=2,
                 shots=2,
                 queries=1,
                 num_task=-1,
                 epoch_length=2,
-                test_ways=len(
-                    get_unique_labels(clf_dataset.match_tags("test"), label_field)
-                ),
+                test_ways=2,
                 test_shots=2,
                 test_queries=1,
             ),
@@ -144,6 +141,8 @@ def meta_learn_cfg(clf_dataset, tmp_path):
     yield cfg_path, model_path, label_field
     cfg_path.unlink(False)
     model_path.unlink(True)
+    if fo.dataset_exists(meta_learn_dataset.name):
+        fo.delete_dataset(meta_learn_dataset.name)
 
 
 def test_metalearning_finetune(meta_learn_cfg):
@@ -156,7 +155,7 @@ def test_metalearning_finetune(meta_learn_cfg):
     split_dataset(conf["data"]["dataset"], splits=dict(support=0.6, query=0.4))
     img_meta.predict(
         support_dataset=conf["data"]["dataset"],
-        support_label_field="resnet50",
+        support_label_field=label_field,
         query_dataset=conf["data"]["dataset"],
         query_label_field="new_label_prediction",
         ckpt_path=str(model_path),
