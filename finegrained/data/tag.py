@@ -1,5 +1,6 @@
 """Tag or untag samples with specific filters or condition
 """
+from pathlib import Path
 from typing import Optional
 
 from fiftyone import ViewField as F
@@ -143,3 +144,27 @@ def retag_missing_labels(
     dataset.tag_samples(to_tags)
 
     return dataset.count_sample_tags()
+
+
+def tag_labels(
+    dataset: str,
+    label_field: str,
+    labels: types.LIST_STR_STR,
+    tags: types.LIST_STR_STR,
+) -> dict:
+    """Tag labels with given tags.
+
+    Args:
+        dataset: fiftyone dataset name
+        label_field: a label field
+        labels: labels to filter, can be a txt file with labels
+        tags: tags to apply
+
+    Returns:
+        a count of label tags for a subset
+    """
+    if (lab := Path(labels)).is_file():
+        labels = lab.read_text().strip().split("\n")
+    dataset = load_fiftyone_dataset(dataset, include_labels={label_field: labels})
+    dataset.tag_labels(tags, label_fields=label_field)
+    return dataset.count_label_tags(label_fields=label_field)

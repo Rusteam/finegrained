@@ -4,6 +4,13 @@ from finegrained.data import tag
 from finegrained.utils.dataset import get_unique_labels
 
 
+@pytest.fixture(scope="module")
+def labels_txt(tmpdir_factory):
+    labels = tmpdir_factory.mktemp("labels").join("labels.txt")
+    labels.write("\n".join(["airplane", "car", "dog"]))
+    return labels
+
+
 def test_tag_samples(temp_dataset):
     tag_name = "new_tag"
     tag_counts = tag.tag_samples(temp_dataset.name, tag_name)
@@ -11,6 +18,17 @@ def test_tag_samples(temp_dataset):
     assert tag_name in tag_counts
     assert tag_counts[tag_name] == len(temp_dataset)
     assert "not_existing_tag" not in tag_counts
+
+
+def test_tag_labels(temp_dataset, labels_txt):
+    tag_name = "new_tag"
+
+    for label in ["airplane", labels_txt]:
+        tag_counts = tag.tag_labels(temp_dataset.name, "ground_truth", label, tag_name)
+
+        assert tag_name in tag_counts
+        assert tag_counts[tag_name] > 0
+        assert "not_existing_tag" not in tag_counts
 
 
 @pytest.mark.parametrize(
