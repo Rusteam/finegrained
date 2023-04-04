@@ -3,6 +3,7 @@
 from typing import Tuple
 
 import fiftyone.core.labels as fol
+import torch
 from fiftyone import Dataset
 from flash import DataModule
 from flash.image import ImageClassificationData, ImageClassifier
@@ -11,6 +12,7 @@ from finegrained.models.flash_base import FlashFiftyOneTask
 from finegrained.models.flash_transforms import get_transform
 from finegrained.utils import types
 from finegrained.utils.dataset import get_all_filepaths, load_fiftyone_dataset
+from finegrained.utils.triton import TritonExporter
 
 # TODO turn into a class
 # TODO split before training
@@ -46,7 +48,7 @@ def _init_query_datamodule(
     return data, dataset
 
 
-class ImageMetalearn(FlashFiftyOneTask):
+class ImageMetalearn(FlashFiftyOneTask, TritonExporter):
     """Image meta learning."""
 
     @property
@@ -199,3 +201,12 @@ class ImageMetalearn(FlashFiftyOneTask):
 
     def _get_available_backbones(self):
         return ImageClassifier.available_backbones()
+
+    def _load_model_torch(self, ckpt_path) -> torch.nn.Module:
+        self._load_pretrained_model(ckpt_path)
+        return self.model.backbone
+
+    def generate_dummy_inputs(
+        self, image_size: int
+    ) -> tuple[torch.Tensor,]:
+        return (torch.rand(1, 3, image_size, image_size),)

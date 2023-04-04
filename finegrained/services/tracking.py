@@ -1,15 +1,19 @@
 """Log metrics and models to MLflow.
 """
 import os
+import warnings
 from pathlib import Path
 from typing import Optional
 
 import mlflow
 import onnx
+from urllib3.exceptions import InsecureRequestWarning
 
 from finegrained.utils import mlflow_server
 from finegrained.utils.mlflow_server import get_tensorboard_files
 from finegrained.utils.os_utils import read_file_config, read_yaml
+
+warnings.filterwarnings("once", category=InsecureRequestWarning)
 
 
 def log_events(path: str | list) -> None:
@@ -63,6 +67,7 @@ def log_run(
     hparams: Optional[str] = None,
     ckpt: Optional[str] = None,
     model: Optional[str] = None,
+    metrics: dict = {},
     log_dir: Optional[str] = None,
     tracking_uri: str = "./mlruns",
     experiment_name: Optional[str] = None,
@@ -79,6 +84,7 @@ def log_run(
         hparams: path to hparams.yaml file as params and labels
         ckpt: path to torch checkpoint file or a dir with checkpoint files
         model: path to onnx model to log as MLflow models
+        metrics: pass extra metrics to log
         log_dir: provide path to tensorboard log dir in order to automatically
             get events, hparams and ckpt paths.
         tracking_uri: mlflow tracking uri
@@ -117,6 +123,8 @@ def log_run(
             log_ckpt(ckpt)
         if model:
             log_model(model)
+        if metrics:
+            mlflow.log_metrics(metrics)
 
     return run_id
 

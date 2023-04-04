@@ -5,6 +5,7 @@ from pathlib import Path
 import fiftyone as fo
 import fiftyone.utils.random as four
 import fiftyone.zoo as foz
+import onnx
 import pytest
 
 from finegrained.data.brain import compute_hardness
@@ -167,6 +168,12 @@ def test_metalearning_finetune(meta_learn_cfg):
     compute_hardness(
         conf["data"]["dataset"], "new_label_prediction", include_tags=["query"]
     )
+
+    onnx_path = model_path.with_suffix(".onnx")
+    img_meta.export_onnx(str(model_path), str(onnx_path), image_size=224)
+    assert onnx_path.exists()
+    onnx_model = onnx.load_model(str(onnx_path))
+    onnx.checker.check_model(onnx_model)
 
 
 @pytest.fixture

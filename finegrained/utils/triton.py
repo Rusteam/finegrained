@@ -74,7 +74,7 @@ class TritonExporter:
     def triton_python_file(self) -> str:
         self.non_implemented()
 
-    def generate_dummy_inputs(self, *args, **kwargs) -> List[torch.Tensor]:
+    def generate_dummy_inputs(self, *args, **kwargs) -> tuple[torch.Tensor]:
         self.non_implemented()
 
     def _load_model_torch(self, *args, **kwargs) -> torch.nn.Module:
@@ -89,22 +89,29 @@ class TritonExporter:
     def _create_triton_ensemble_config(self, *args, **kwargs):
         self.non_implemented()
 
-    def export_onnx(self, model_path: str, write_path: str, **kwargs):
+    def export_onnx(self, model_path: str, write_path: str = "auto", **kwargs):
         """Create an ONNX model from a torch model.
 
         Args:
             model_path: flash training checkpoint
-            write_path: where to save onnx model (*.onnx extension)
-            image_size: model input size
+            write_path: where to save onnx model (*.onnx extension),
+                if default 'auto' then save to the same dir as model_path
+                but with *.onnx extension
+            kwargs: keyword arguments to pass to generating dummy inputs
         """
         # TODO create output dir if not exist
         # TODO use same dir by default
+        if write_path == "auto":
+            write_path = Path(model_path).with_suffix(".onnx")
+            if write_path.exists():
+                raise FileExistsError(f"{write_path=!r} already exists")
+
         model = self._load_model_torch(model_path)
         dummy = self.generate_dummy_inputs(**kwargs)
         torch.onnx.export(
             model,
             dummy,
-            write_path,
+            str(write_path),
             input_names=self.input_names,
             output_names=self.output_names,
             dynamic_axes=self.dynamic_axes,

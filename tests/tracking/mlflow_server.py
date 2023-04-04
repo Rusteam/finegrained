@@ -93,6 +93,7 @@ def test_log_run(mlflow_tracking, tfevents, onnx_model, tmp_path):
         ckpt=str(ckpt),
         model=str(onnx_model),
         experiment_name=exp_name,
+        metrics={"extra_metric": 0.5},
     )
 
     assert mlflow.get_tracking_uri() == tracking_uri
@@ -115,6 +116,7 @@ def test_log_run(mlflow_tracking, tfevents, onnx_model, tmp_path):
     scalars = mlflow_server.read_tensorboard_scalars(events)
     expected = mlflow_server.parse_tensorboard_scalars(scalars)[-1]
     expected.pop("epoch")
+    expected.update({"extra_metric": 0.5})
     assert run.data.metrics == expected
 
     # params
