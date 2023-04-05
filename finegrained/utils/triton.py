@@ -6,6 +6,7 @@ from typing import List
 
 import torch
 from google.protobuf import json_format, text_format
+from onnxruntime import InferenceSession
 
 
 def save_triton_config(config: dict, write_file: str) -> None:
@@ -207,3 +208,18 @@ class TritonExporter:
         print(
             f"Triton-python model has been exported to {str(model_version_dir.parent)}"
         )
+
+    @staticmethod
+    def print_onnx(model_path: str):
+        """Print ONNX model inputs and outputs.
+
+        Args:
+            model_path: path to the ONNX model
+        """
+        ort = InferenceSession(model_path)
+        print("INPUTS:")
+        for inp in ort.get_inputs():
+            print(">>>", inp)
+        print("\nOUTPUTS:")
+        for out in ort.get_outputs():
+            print(">>>", out)
