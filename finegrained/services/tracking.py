@@ -97,7 +97,6 @@ def log_run(
     Returns:
         MLflow run id
     """
-    assert log_dir or events, "Either log_dir or events must be specified"
 
     mlflow_server.connect_to_mlflow(
         tracking_uri,

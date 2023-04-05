@@ -210,3 +210,35 @@ class ImageMetalearn(FlashFiftyOneTask, TritonExporter):
         self, image_size: int
     ) -> tuple[torch.Tensor,]:
         return (torch.rand(1, 3, image_size, image_size),)
+
+    def _create_triton_ensemble_config(
+        self, preprocessing_name: str, feature_extractor: str, embedding_size: int
+    ) -> dict:
+        return {
+            "platform": "ensemble",
+            "max_batch_size": 1,
+            "input": [dict(name="IMAGE", dims=[-1, -1, 3], data_type="TYPE_UINT8")],
+            "output": [
+                dict(
+                    name="FEATURES",
+                    dims=[embedding_size],
+                    data_type="TYPE_FP32",
+                )
+            ],
+            "ensemble_scheduling": dict(
+                step=[
+                    dict(
+                        model_name=preprocessing_name,
+                        model_version=-1,
+                        input_map=dict(image="IMAGE"),
+                        output_map=dict(output="PREPROCESSED"),
+                    ),
+                    dict(
+                        model_name=feature_extractor,
+                        model_version=-1,
+                        input_map=dict(image="PREPROCESSED"),
+                        output_map=dict(output="FEATURES"),
+                    ),
+                ]
+            ),
+        }

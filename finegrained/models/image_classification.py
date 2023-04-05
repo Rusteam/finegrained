@@ -224,7 +224,7 @@ class ImageClassification(FlashFiftyOneTask, TritonExporter):
 
     def _create_triton_ensemble_config(
         self, preprocessing_name: str, classifier_name: str
-    ):
+    ) -> dict:
         return {
             "platform": "ensemble",
             "max_batch_size": 1,
@@ -274,9 +274,8 @@ class ImageTransform(torch.nn.Module, TritonExporter):
         batch = transformed.unsqueeze(0)
         return batch
 
-    @staticmethod
-    def generate_dummy_inputs(image_size: types.IMAGE_SIZE):
-        h, w = parse_image_size(image_size)
+    def generate_dummy_inputs(self, **kwargs) -> tuple[torch.Tensor]:
+        h, w = parse_image_size(self.image_size)
         dummy = torch.randint(
             0, 255, size=(1, h * 2 + 1, w * 3 - 10, 3), dtype=torch.uint8
         )

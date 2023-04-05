@@ -87,7 +87,7 @@ class TritonExporter:
     def _generate_triton_python_names(self, *args, **kwargs):
         self.non_implemented()
 
-    def _create_triton_ensemble_config(self, *args, **kwargs):
+    def _create_triton_ensemble_config(self, *args, **kwargs) -> dict:
         self.non_implemented()
 
     def export_onnx(self, model_path: str, write_path: str = "auto", **kwargs):
@@ -101,7 +101,6 @@ class TritonExporter:
             kwargs: keyword arguments to pass to generating dummy inputs
         """
         # TODO create output dir if not exist
-        # TODO use same dir by default
         if write_path == "auto":
             write_path = Path(model_path).with_suffix(".onnx")
             if write_path.exists():
@@ -151,11 +150,13 @@ class TritonExporter:
                     write_path=model_version_dir / "model.pt", **kwargs
                 )
             else:
-                self.export_onnx(ckpt_path, model_version_dir / "model.onnx", **kwargs)
+                self.export_onnx(
+                    ckpt_path, str(model_version_dir / "model.onnx"), **kwargs
+                )
 
         if config := self._create_triton_config(torchscript=torchscript, **kwargs):
             write_config = model_version_dir.parent / "config.pbtxt"
-            save_triton_config(config, write_config)
+            save_triton_config(config, str(write_config))
 
         if labels := self.triton_labels:
             _export_txt_file(labels, model_version_dir.parent / self.triton_labels_path)
@@ -165,11 +166,19 @@ class TritonExporter:
     def export_triton_ensemble(
         self, triton_repo: str, triton_name: str, version: int = 1, **kwargs
     ):
+        """Create a triton ensemble model.
+
+        Args:
+            triton_repo: triton model repository path
+            triton_name: triton model name
+            version: triton model version
+            kwargs: extra params to pass to _create_triton_ensemble_config
+        """
         model_version_dir = init_model_repo(triton_repo, triton_name, version)
 
         if config := self._create_triton_ensemble_config(**kwargs):
             write_config = model_version_dir.parent / "config.pbtxt"
-            save_triton_config(config, write_config)
+            save_triton_config(config, str(write_config))
 
         print(f"Triton-ensemble has been exported to {str(model_version_dir.parent)}")
 

@@ -7,10 +7,16 @@ import fiftyone.utils.random as four
 import fiftyone.zoo as foz
 import onnx
 import pytest
+import torch
 
 from finegrained.data.brain import compute_hardness
 from finegrained.data.tag import split_classes, split_dataset
-from finegrained.models import ImageClassification, ImageMetalearn, ImageSelfSupervised
+from finegrained.models import (
+    ImageClassification,
+    ImageMetalearn,
+    ImageSelfSupervised,
+    ImageTransform,
+)
 from finegrained.utils.os_utils import read_yaml, write_yaml
 
 
@@ -176,6 +182,20 @@ def test_metalearning_finetune(meta_learn_cfg):
     onnx.checker.check_model(onnx_model)
 
 
+def test_image_metalearn_triton_ensemble(tmp_path):
+    img_meta = ImageMetalearn()
+    img_meta.export_triton_ensemble(
+        str(tmp_path / "triton"),
+        "prototypical",
+        version=1,
+        preprocessing_name="image_transform",
+        feature_extractor="feature_extractor",
+        embedding_size=128,
+    )
+    assert (tmp_path / "triton" / "prototypical" / "1").exists()
+    assert (tmp_path / "triton" / "prototypical" / "config.pbtxt").exists()
+
+
 @pytest.fixture
 def selfsupervised_config(clf_dataset, tmp_path):
     cfg_path = Path(tmp_path) / "embed_config.yaml"
@@ -213,3 +233,15 @@ def test_selfsupervised_finetune(selfsupervised_config):
     img_emb = ImageSelfSupervised()
     img_emb.finetune(str(cfg_path))
     assert model_path.exists()
+
+
+def test_image_transform(tmp_path):
+    img_t = ImageTransform(size=112)
+    img = torch.rand(224, 224, 3)
+    out = img_t(img)
+
+    assert out.size() == torch.Size([1, 3, 112, 112])
+    assert out.dtype == torch.float32
+
+    img_t.export_onnx(str(tmp_path / "img_t.onnx"))
+    assert (tmp_path / "img_t.onnx").exists()
