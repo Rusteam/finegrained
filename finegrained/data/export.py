@@ -1,6 +1,6 @@
 """Dataset converting and exporting utils.
 """
-from typing import List
+from typing import List, Optional
 
 import fiftyone.types as fot
 
@@ -51,4 +51,34 @@ def to_cvat(dataset: str, label_field: str, export_dir: str, **kwargs):
         export_dir=export_dir,
         dataset_type=fot.CVATImageDataset,
         label_field=label_field,
+    )
+
+
+def to_csv(
+    dataset: str,
+    label_field: str,
+    export_path: str,
+    extra_fields: Optional[list[str]] = None,
+    **kwargs,
+):
+    """Export a dataset into CSV format for uploading to external sources.
+
+    Args:
+        dataset: fiftyone dataset name
+        label_field: field that contains labels (will be mapped to 'label')
+        export_path: where to write csv file
+        extra_fields: extra fields to be added to csv
+        **kwargs: dataset loading filters
+    """
+    dataset = load_fiftyone_dataset(dataset, **kwargs)
+    label_field = f"{label_field}.label"
+    fields = {"filepath": "image", label_field: "label"}
+    if extra_fields:
+        fields.update({k: k for k in extra_fields})
+    dataset.export(
+        dataset_type=fot.CSVDataset,
+        abs_paths=True,
+        export_media=False,
+        labels_path=export_path,
+        fields=fields,
     )
