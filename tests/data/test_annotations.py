@@ -30,7 +30,7 @@ def backend_config():
     )
 
 
-def test_annotate_samples(temp_dataset_anno, backend_config):
+def test_annotate_new_field(temp_dataset_anno, backend_config):
     dataset, name, anno_key = temp_dataset_anno
     target_classes = ["foo", "bar", "baz"]
     label_field = "label_test"
@@ -38,10 +38,12 @@ def test_annotate_samples(temp_dataset_anno, backend_config):
         dataset=name,
         annotation_key=anno_key,
         label_field=label_field,
-        backend=backend_config,
-        dataset_kwargs={"max_samples": 5},
         label_type="classification",
+        backend=backend_config,
         classes=target_classes,
+        task_name="unit-test",
+        segment_size=None,
+        **{"max_samples": 5}
     )
 
     results = dataset.get_annotation_info(anno_key)

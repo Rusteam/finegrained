@@ -49,7 +49,12 @@ def _resize_image(img: torch.Tensor, target_size: int) -> torch.Tensor:
 
 
 def object_detection(
-    dataset: str, label_field: str, conf: float = 0.25, image_size=None, **kwargs
+    dataset: str,
+    label_field: str,
+    conf: float = 0.25,
+    image_size=None,
+    device=None,
+    **kwargs
 ):
     """Detect COCO objects with mask-rcnn-v2 from torchvision
 
@@ -67,7 +72,7 @@ def object_detection(
     # prepare the model
     weights = MaskRCNN_ResNet50_FPN_V2_Weights.DEFAULT
     model = maskrcnn_resnet50_fpn_v2(weights=weights, box_score_thresh=conf)
-    device = get_device()
+    device = get_device()[0] if device is None else torch.device(device)
     model.eval().to(device)
     preprocess = weights.transforms()
 

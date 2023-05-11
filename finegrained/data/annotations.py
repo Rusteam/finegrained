@@ -37,7 +37,13 @@ def annotate(
     label_field: str,
     backend: Any,
     overwrite: bool = False,
-    dataset_kwargs: Optional[dict] = None,
+    label_type: Optional[str] = None,
+    project_id: Optional[int] = None,
+    segment_size: int = 10,
+    task_name: Optional[str] = None,
+    image_quality: int = 75,
+    task_asignee: Optional[str] = None,
+    classes: Optional[str] = None,
     **kwargs,
 ):
     """Send samples to annotations
@@ -46,27 +52,40 @@ def annotate(
         dataset: fiftyone dataset with samples
         annotation_key: assign this key for annotation run
         label_field: if exists, upload labels
+        label_type: if label_field does not exist, this has to be specified
         backend: backend name or filepath to configs
         overwrite: overwrite existing annotation run if True
-        dataset_kwargs: dataset loading filters
-        **kwargs: annotation kwargs
-
-    Returns:
-        none
+        classes: list of classes or path to labels.txt file
+        image_quality: image upload quality
+        task_name: custom task name, by default dataset name + annotation key
+        segment_size: number of frames/images per one job
+        project_id: which cvat project to connect to
+        task_asignee: assignee for the task
+        **kwargs: dataset loading filters
     """
-    # TODO kwargs for dataset, specify other explicitely
-    dataset = load_fiftyone_dataset(
-        dataset, **dataset_kwargs if bool(dataset_kwargs) else {}
-    )
+    dataset = load_fiftyone_dataset(dataset, **kwargs)
     backend_conf = _load_backend_config(backend)
     if dataset.has_annotation_run(annotation_key) and overwrite:
         dataset.delete_annotation_run(annotation_key)
-    if "classes" in kwargs:
-        kwargs["classes"] = _parse_classes(kwargs["classes"])
+    if not dataset.has_sample_field(label_field) and label_type is None:
+        raise ValueError(
+            f"{label_field=} does not exist in {dataset.name}. Specify 'label_type'"
+        )
+    if classes:
+        classes = _parse_classes(classes)
+    if task_name is None:
+        task_name = dataset.name + " - " + annotation_key
     dataset.annotate(
         annotation_key,
         label_field=label_field,
-        **backend_conf | kwargs,
+        label_type=label_type,
+        project_id=project_id,
+        segment_size=segment_size,
+        task_name=task_name,
+        image_quality=image_quality,
+        classes=classes,
+        task_asignee=task_asignee,
+        **backend_conf,
     )
 
 

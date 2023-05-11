@@ -35,3 +35,20 @@ def to_yolov5(
             label_field=label_field,
             classes=labels,
         )
+
+
+def to_cvat(dataset: str, label_field: str, export_dir: str, **kwargs):
+    """Export a dataset into CVAT format for annotation.
+
+    Args:
+        dataset: fiftyone dataset name
+        label_field: field that contains labels
+        export_dir: where to write data
+        **kwargs: dataset loading filters
+    """
+    dataset = load_fiftyone_dataset(dataset, **kwargs)
+    dataset.export(
+        export_dir=export_dir,
+        dataset_type=fot.CVATImageDataset,
+        label_field=label_field,
+    )
