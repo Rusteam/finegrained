@@ -5,8 +5,6 @@ from pathlib import Path
 import numpy as np
 import pytest
 import torch
-from onnxruntime import InferenceSession
-from transformers.utils import to_numpy
 
 from finegrained.models import SentenceEmbeddings
 from tests.models.test_export import (
@@ -20,6 +18,9 @@ SENTENCE_EMBEDDINGS = ["symanto/sn-xlm-roberta-base-snli-mnli-anli-xnli"]
 
 @pytest.mark.parametrize("model_name", SENTENCE_EMBEDDINGS)
 def test_onnx(model_name, tmp_path):
+    from onnxruntime import InferenceSession
+    from transformers.utils import to_numpy
+
     write_path = str(Path(tmp_path) / "model.onnx")
     sent_emb = SentenceEmbeddings(model_name=model_name, device="cpu")
     sent_emb.export_onnx(write_path)

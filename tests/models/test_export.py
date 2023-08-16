@@ -4,13 +4,10 @@ from typing import List
 
 import fiftyone as fo
 import fiftyone.zoo as foz
-import onnx
 import pytest
 import torch
 from flash import Trainer
 from flash.image import ImageClassifier
-from onnxruntime import InferenceSession
-from transformers.utils import to_numpy
 
 from finegrained.models import ImageClassification, ImageTransform
 from finegrained.models.image_classification import SoftmaxClassifier
@@ -174,6 +171,9 @@ def test_yolov5_post(triton_repo, torchscript):
 def _verify_model_outputs(
     model: torch.nn.Module, exported_path: str, dummy: List[torch.Tensor]
 ):
+    from onnxruntime import InferenceSession
+    from transformers.utils import to_numpy
+
     if exported_path.endswith(".onnx"):
         ort = InferenceSession(exported_path, providers=["CPUExecutionProvider"])
         input_names = [inp.name for inp in ort.get_inputs()]
@@ -229,5 +229,7 @@ def _check_triton_labels(model_dir):
 
 
 def _check_onnx_model(onnx_path):
+    import onnx
+
     onnx_model = onnx.load_model(onnx_path)
     onnx.checker.check_model(onnx_model)

@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Optional
 
 import mlflow
-import onnx
 from urllib3.exceptions import InsecureRequestWarning
 
 from finegrained.utils import mlflow_server
@@ -134,6 +133,8 @@ def log_model(path: str) -> None:
     Args:
         path: path to onnx model file
     """
+    import onnx
+
     assert path.endswith(".onnx")
     model = onnx.load_model(path)
     mlflow.onnx.log_model(model, artifact_path="model")

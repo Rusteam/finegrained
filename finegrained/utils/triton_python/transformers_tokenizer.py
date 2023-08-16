@@ -1,7 +1,6 @@
 """Transformers tokenizer in triton's python backend format
 """
 import triton_python_backend_utils as pb_utils
-from transformers import AutoTokenizer
 
 # TODO link file instead of downloading
 # TODO load from a name
@@ -10,6 +9,8 @@ from transformers import AutoTokenizer
 
 class TritonPythonModel:
     def initialize(self, args):
+        from transformers import AutoTokenizer
+
         self.tokenizer = AutoTokenizer.from_pretrained(
             "symanto/sn-xlm-roberta-base-snli-mnli-anli-xnli"
         )

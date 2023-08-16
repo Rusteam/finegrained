@@ -6,7 +6,6 @@ from typing import List
 
 import torch
 from google.protobuf import json_format, text_format
-from onnxruntime import InferenceSession
 
 
 def save_triton_config(config: dict, write_file: str) -> None:
@@ -225,6 +224,8 @@ class TritonExporter:
         Args:
             model_path: path to the ONNX model
         """
+        from onnxruntime import InferenceSession
+
         ort = InferenceSession(model_path)
         print("INPUTS:")
         for inp in ort.get_inputs():

@@ -5,7 +5,6 @@ from pathlib import Path
 import fiftyone as fo
 import fiftyone.utils.random as four
 import fiftyone.zoo as foz
-import onnx
 import pytest
 import torch
 
@@ -153,6 +152,8 @@ def meta_learn_cfg(clf_dataset, tmp_path):
 
 
 def test_metalearning_finetune(meta_learn_cfg):
+    import onnx
+
     cfg, model_path, label_field = meta_learn_cfg
     img_meta = ImageMetalearn()
     img_meta.finetune(cfg)

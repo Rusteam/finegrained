@@ -4,7 +4,6 @@ import shutil
 from pathlib import Path
 
 import torch
-from transformers import AutoModel, AutoTokenizer
 
 from finegrained.models import torch_utils
 from finegrained.utils import types
@@ -36,6 +35,8 @@ class TransformersBase:
         batch_size: int = torch_utils.get_default_batch_size(),
         device=torch_utils.get_device(),
     ):
+        from transformers import AutoModel, AutoTokenizer
+
         self.device = device
         self._tokenizer = AutoTokenizer.from_pretrained(model_name)
         self._model = AutoModel.from_pretrained(model_name).to(device)
