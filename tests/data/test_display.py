@@ -12,14 +12,23 @@ def test_print_labels(temp_dataset, capsys):
     assert len(labels) == 77
 
 
-def test_classification_report(temp_dataset, capsys):
-    display.classification_report(
-        temp_dataset.name, "resnet18-imagenet-torch", "resnet18-imagenet-torch"
-    )
+@pytest.mark.parametrize(
+    "pred_field,gt_field,check_fields",
+    [
+        (
+            "resnet18-imagenet-torch",
+            "resnet18-imagenet-torch",
+            "precision,recall,accuracy".split(","),
+        ),
+        ("predictions", "ground_truth", "f1-score,micro avg".split(",")),
+    ],
+)
+def test_eval_report(temp_dataset, capsys, pred_field, gt_field, check_fields):
+    display.eval_report(temp_dataset.name, pred_field, gt_field)
     captured = capsys.readouterr()
-    assert "precision" in captured.out
-    assert "recall" in captured.out
-    assert "accuracy" in captured.out
+
+    for field in check_fields:
+        assert field in captured.out
 
 
 @pytest.mark.parametrize("avg_size", [False, True])
