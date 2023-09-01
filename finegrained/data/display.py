@@ -56,6 +56,9 @@ def eval_report(
 
     results = eval_fn(predictions, gt_field=gt_field, classes=labels, **eval_kwargs)
     results.print_report()
+    if hasattr(results, "mAP") and (mAP := results.mAP()):
+        iou = eval_kwargs.get("iou", 0.5)
+        print(f"> {mAP=:.4f} @ {iou=}")
     if cmat:
         cm = results.plot_confusion_matrix(backend="matplotlib")
         cm.show()

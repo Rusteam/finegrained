@@ -43,6 +43,7 @@ def annotate(
     task_name: Optional[str] = None,
     image_quality: int = 75,
     task_asignee: Optional[str] = None,
+    organization: Optional[str] = None,
     classes: Optional[str] = None,
     **kwargs,
 ):
@@ -85,6 +86,7 @@ def annotate(
         image_quality=image_quality,
         classes=classes,
         task_asignee=task_asignee,
+        organization=organization,
         **backend_conf,
     )
 

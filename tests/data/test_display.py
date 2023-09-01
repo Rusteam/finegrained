@@ -24,7 +24,9 @@ def test_print_labels(temp_dataset, capsys):
     ],
 )
 def test_eval_report(temp_dataset, capsys, pred_field, gt_field, check_fields):
-    display.eval_report(temp_dataset.name, pred_field, gt_field)
+    display.eval_report(
+        temp_dataset.name, pred_field, gt_field, eval_kwargs=dict(compute_mAP=True)
+    )
     captured = capsys.readouterr()
 
     for field in check_fields:
