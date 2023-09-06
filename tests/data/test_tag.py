@@ -71,3 +71,15 @@ def test_split_classes(temp_dataset):
 
     label_counts = temp_dataset.match_tags("val").count_values("resnet50.label")
     assert min(label_counts.values()) >= 2
+
+
+@pytest.mark.parametrize(
+    "size_tags",
+    [
+        list("SMLX"),
+        dict(s=50, m=80, l=100),
+    ],
+)
+def test_tag_by_size(temp_dataset, size_tags):
+    tag_counts = tag.tag_by_size(temp_dataset.name, size_tags)
+    assert all([t in tag_counts for t in size_tags])

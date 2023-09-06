@@ -7,8 +7,10 @@ model to detect and recognize fine-grained objects on images and video.
 This package is built upon an open-source computer vision data management tool
 [FiftyOne](https://docs.voxel51.com/index.html). It also provides an integration
 with a data annotation tool [CVAT](https://www.cvat.ai/) and a model-training framework
-[Lightning Flash](https://lightning-flash.readthedocs.io/) that are 
+[Lightning Flash](https://lightning-flash.readthedocs.io/) that are
 used to prepare data and train models.
+
+[Docs](https://finegrained-docs.website.yandexcloud.net/) are temporarily hosted on Yandex.Cloud.
 
 ## Structure
 

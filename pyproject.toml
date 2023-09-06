@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "finegrained"
-version = "0.1.1"
+version = "0.1.2"
 description = "Quickly prepare data, train new models and export to production from a command line"
 authors = ["Rustem Galiullin <rustemgal@gmail.com>"]
 license = "MIT"

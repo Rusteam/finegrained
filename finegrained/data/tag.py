@@ -3,6 +3,7 @@
 from pathlib import Path
 from typing import Optional
 
+import numpy as np
 from fiftyone import ViewField as F
 from fiftyone.utils import random as four
 from sklearn.model_selection import train_test_split
@@ -168,3 +169,74 @@ def tag_labels(
     dataset = load_fiftyone_dataset(dataset, include_labels={label_field: labels})
     dataset.tag_labels(tags, label_fields=label_field)
     return dataset.count_label_tags(label_fields=label_field)
+
+
+def _check_existing_tags(dataset, tags, overwrite):
+    """Check if dataset already contains tags.
+
+    Args:
+        dataset: fiftyone dataset
+        tags: tags to check
+        overwrite: if True, overwrite existing tags
+
+    Raises:
+        ValueError: if tags already exist and overwrite is False
+    """
+    existing_tags = dataset.tags
+    is_overlap = any([t in existing_tags for t in tags])
+    if len(existing_tags) > 0 and is_overlap:
+        if overwrite:
+            dataset.untag_samples(tags)
+        else:
+            raise ValueError(f"Dataset already contains tags: {existing_tags}")
+
+
+def tag_by_size(
+    dataset: str,
+    tags: list[str] | dict = ["small", "medium", "large"],
+    overwrite: bool = False,
+    **kwargs,
+) -> dict:
+    """Tag samples by image size.
+
+    All samples will be grouped by number of given tags using
+    percentiles of combined width and height.
+
+    Tags must be given in ascending order.
+
+    Args:
+        dataset: fiftyone dataset name
+        tags: tags to apply in ascending order as a list, or a dict of tag names
+              and percentiles (0-100).
+        overwrite: if tags already exist, overwrite them
+        **kwargs: dataset loading kwargs, i.e. filters
+
+    Returns:
+        a dict of sample tag counts
+    """
+    dataset = load_fiftyone_dataset(dataset, **kwargs)
+    if isinstance(tags, list):
+        percentiles = [int(100 * i / len(tags)) for i in range(1, len(tags) + 1)]
+    elif isinstance(tags, dict):
+        percentiles = list(tags.values())
+        tags = list(tags.keys())
+    else:
+        raise ValueError(f"Tags must be dict or list, recived: {type(tags)}")
+
+    _check_existing_tags(
+        dataset, tags if isinstance(tags, list) else list(tags.keys()), overwrite
+    )
+    dataset.compute_metadata()
+
+    size_fn = (F("metadata.width") + F("metadata.height")) / 2
+    size = dataset.values(size_fn)
+
+    start = 0
+    for tag, end in zip(tags, percentiles):
+        start_value, end_value = np.percentile(size, start), np.percentile(size, end)
+        select_by_size = (size_fn > start_value) & (size_fn <= end_value)
+        view = dataset.match(size_fn.let_in(select_by_size))
+        view.tag_samples(tag)
+        start = end
+
+    return {k: v for k, v in dataset.count_sample_tags().items() if k in tags}
