@@ -8,13 +8,15 @@ This package is built upon an open-source computer vision data management tool
 [FiftyOne](https://docs.voxel51.com/index.html). It also provides an integration
 with a data annotation tool [CVAT](https://www.cvat.ai/) and a model-training framework
 [Lightning Flash](https://lightning-flash.readthedocs.io/) that are 
+used to prepare data and train models.
 
 ## Structure
 
 The package is structured as follows:
 
-- **data**: contains the code to prepare data for training
-- **models**: contains the code to train, evaluate and export models
+- **data**: data prep for training
+- **models**: train, evaluate and export models
+- **services**: interact with external services
 
 ## Development installation
 

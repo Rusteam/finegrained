@@ -5,6 +5,8 @@ It heavily depends on the [FiftyOne](https://voxel51.com/docs/fiftyone/index.htm
 and its integrations. 
 There are the following submodules:
 
+## Submodules
+
 1. **annotations** - send data for annotation in CVAT and fetch annotations.
 2. **brain** - commands for `fiftyone.brain` module.
 3. **display** - print dataset-related stats to a console.
@@ -13,6 +15,30 @@ There are the following submodules:
 6. **transforms** - perform changes on datasets.
 7. **zoo** - perform operations with `fiftyone.zoo` module.
 
-Read below for more details on API and usage.
+::: finegrained.data.annotations
+    options:
+        show_root_heading: true
 
-::: fiftyone.data.annotations
+::: finegrained.data.brain
+    options:
+        show_root_heading: true
+
+::: finegrained.data.display
+    options:
+        show_root_heading: true
+
+::: finegrained.data.export
+    options:
+        show_root_heading: true
+
+::: finegrained.data.tag
+    options:
+        show_root_heading: true
+
+::: finegrained.data.transforms
+    options:
+        show_root_heading: true
+
+::: finegrained.data.zoo
+    options:
+        show_root_heading: true
