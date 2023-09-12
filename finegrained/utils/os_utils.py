@@ -19,7 +19,7 @@ def parse_keyval_line(line: str) -> tuple:
 
 
 def read_file_config(file: str, section=None):
-    if file.endswith((".txt", ".text")):
+    if file.endswith((".txt", ".text", ".env")):
         config = read_txt_credentials(file)
     elif file.endswith(".ini"):
         config = read_ini_credentials(file, section=section)
