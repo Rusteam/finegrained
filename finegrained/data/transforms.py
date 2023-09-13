@@ -421,3 +421,41 @@ def transpose_images(dataset: str, **kwargs) -> fo.DatasetView:
         Image.open(smp.filepath).transpose(Image.ROTATE_90).save(smp.filepath)
 
     return dataset
+
+
+def tags_to_labels(
+    dataset: str,
+    label_field: str,
+    tags: list[str] = None,
+    overwrite: bool = False,
+    **kwargs,
+) -> dict:
+    """Convert tags to classification labels.
+
+    Args:
+        dataset: fiftyone dataset name
+        label_field: a field with detections to be updated
+        tags: which tags to convert to labels, if skipped all tags will be used
+        **kwargs: dataset loading filters
+
+    Returns:
+        a dataset view instance
+    """
+
+    dataset = load_fiftyone_dataset(dataset, **kwargs)
+
+    if overwrite and dataset.has_sample_field(label_field):
+        dataset.delete_sample_field(label_field)
+    elif dataset.has_sample_field(label_field):
+        raise ValueError(f"{label_field=} already exists")
+
+    if not tags:
+        tags = dataset.distinct("tags")
+
+    for tag in tags:
+        tag_view = dataset.match_tags(tag)
+        clf_labels = [fo.Classification(label=tag) for _ in range(len(tag_view))]
+        tag_view.set_values(label_field, clf_labels)
+        print(f"Added {tag!r} classification labels to {len(tag_view)} samples")
+
+    return dataset.count_values(f"{label_field}.label")

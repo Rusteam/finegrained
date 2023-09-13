@@ -289,3 +289,16 @@ def test_transpose_images(temp_dataset, tmp_path):
         new_size = Image.open(p).size
         assert new_size[1] == size[0]
         assert new_size[0] == size[1]
+
+
+def test_tags_to_labels(temp_dataset):
+    from finegrained.data import tag
+
+    tag.split_dataset(temp_dataset.name, splits=dict(one=0.5, two=0.5))
+    counts = transforms.tags_to_labels(
+        temp_dataset.name,
+        tags=["one", "two"],
+        label_field="label_from_tag",
+    )
+    assert counts["one"] > 0
+    assert counts["two"] > 0
