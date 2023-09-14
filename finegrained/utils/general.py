@@ -11,7 +11,7 @@ def parse_list_str(value: types.LIST_STR_STR) -> types.LIST_STR:
         a list[str]
     """
     if isinstance(value, str):
-        return [value]
+        return value.split(",")
     elif isinstance(value, (list, tuple)):
         return value
     else:

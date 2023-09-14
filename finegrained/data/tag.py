@@ -240,3 +240,22 @@ def tag_by_size(
         start = end
 
     return {k: v for k, v in dataset.count_sample_tags().items() if k in tags}
+
+
+def delete_tags(dataset: str, tags: Optional[list[str]] = None, **kwargs) -> dict:
+    """Delete sample tags from dataset.
+
+    Args:
+        dataset: fiftyone dataset name
+        tags: tags to delete, if None, all tags will be deleted
+
+    Returns:
+        a dict of sample tag counts
+    """
+    dataset = load_fiftyone_dataset(dataset, **kwargs)
+    if tags is None:
+        tags = list(dataset.count_sample_tags().keys())
+    else:
+        tags = parse_list_str(tags)
+    dataset.untag_samples(tags)
+    return dataset.count_sample_tags()
