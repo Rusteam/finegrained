@@ -4,13 +4,19 @@ import shutil
 from pathlib import Path
 from typing import Optional
 
+import cv2
 import fiftyone as fo
 from fiftyone.types import ImageClassificationDirectoryTree
 from PIL import Image, ImageOps, UnidentifiedImageError
 from tqdm import tqdm
 
 from ..utils import types
-from ..utils.dataset import create_fiftyone_dataset, load_fiftyone_dataset
+from ..utils.dataset import (
+    create_fiftyone_dataset,
+    from_albumentations_box,
+    load_fiftyone_dataset,
+    to_albumentations_box,
+)
 from ..utils.general import parse_list_str
 from ..utils.os_utils import read_json, read_yaml, write_json
 
@@ -459,3 +465,132 @@ def tags_to_labels(
         print(f"Added {tag!r} classification labels to {len(tag_view)} samples")
 
     return dataset.count_values(f"{label_field}.label")
+
+
+def compute_aspect_ratio(
+    dataset: str, field: str = "aspect_ratio", **kwargs
+) -> fo.DatasetView:
+    """Compute aspect ratio for each sample.
+
+    Args:
+        dataset: fiftyone dataset name
+        field: which field save aspect ratio to
+        **kwargs: dataset loading filters
+
+    Returns:
+        a dataset view instance
+    """
+    dataset = load_fiftyone_dataset(dataset, **kwargs)
+    dataset.compute_metadata()
+
+    for smp in tqdm(dataset.select_fields(["metadata"])):
+        smp[field] = smp.metadata["width"] / smp.metadata["height"]
+        smp.save()
+
+    return dataset
+
+
+def divide_images(
+    dataset: str,
+    label_field: str,
+    target_size: int,
+    to_dataset_name: str = "auto",
+    dest_dir: str = "auto",
+    bbox_params: dict = {},
+    skip_empty: bool = True,
+    keep_sample_tags: bool = False,
+    overwrite: bool = False,
+    **kwargs,
+) -> fo.Dataset:
+    """Divide images into patches of target_size and create new dataset.
+
+    Patches are non-overlapping with black pixels if needed.
+
+    Args:
+        dataset: fiftyone dataset name
+        label_field: a field with detections
+                    (only detections supported at the moment)
+        target_size: target image size, some patches will be smaller
+                    if image size is not divisible by target_size
+        to_dataset_name: a new dataset name
+        dest_dir: a directory where cropped patches will be saved
+        skip_empty: whether to skip patches without labels
+        keep_sample_tags: if True, sample tags from source samples
+                    will be copied to new samples
+        bbox_params: albumentations parameters for keeping bounding boxes
+                    such as min_visibility [0.0, 1.0] and min_area [0, target_size]
+        overwrite: whether to overwrite existing new dataset
+        **kwargs: dataset loading filters
+    """
+    import albumentations as A
+
+    dataset = load_fiftyone_dataset(dataset, **kwargs)
+    dataset = dataset.exists(label_field)
+    if len(dataset) == 0:
+        raise ValueError(f"{dataset.name=} has no {label_field=}")
+    else:
+        label_type = dataset.get_field(label_field).document_type
+        if label_type != fo.Detections:
+            raise NotImplementedError(f"{label_type=} not implemented")
+
+    dest_dir = (
+        Path(dest_dir)
+        if dest_dir != "auto"
+        else Path(f"./finegrained/images/{dataset.name}-divided-{target_size}")
+    )
+    dest_dir.mkdir(parents=True, exist_ok=True)
+
+    if to_dataset_name == "auto":
+        dataset_name = getattr(dataset, "dataset_name", dataset.name)
+        to_dataset_name = f"{dataset_name}-divided-{target_size}"
+    if fo.dataset_exists(to_dataset_name) and overwrite:
+        fo.delete_dataset(to_dataset_name, verbose=True)
+    elif fo.dataset_exists(to_dataset_name):
+        raise ValueError(f"{to_dataset_name=} already exists")
+
+    new_dataset = fo.Dataset(name=to_dataset_name, persistent=True)
+    new_samples = []
+    for smp in tqdm(dataset.select_fields([label_field]), "dividing images"):
+        img = cv2.imread(smp.filepath)
+        height, width = img.shape[:2]
+
+        for i in range(0, height, target_size):
+            for j in range(0, width, target_size):
+                transform = A.Compose(
+                    [
+                        A.Crop(
+                            x_min=j,
+                            y_min=i,
+                            x_max=min(width, j + target_size),
+                            y_max=min(height, i + target_size),
+                        )
+                    ],
+                    bbox_params=A.BboxParams(format="albumentations", **bbox_params),
+                )
+                boxes = [
+                    to_albumentations_box(detection)
+                    for detection in smp[label_field].detections
+                ]
+                patch = transform(image=img, bboxes=boxes)
+                patch_detections = [
+                    from_albumentations_box(box) for box in patch["bboxes"]
+                ]
+
+                if skip_empty and len(patch_detections) == 0:
+                    continue
+
+                patch_name = (
+                    dest_dir / f"{smp.id}_{i}_{j}.{smp.filepath.split('.')[-1]}"
+                )
+                cv2.imwrite(str(patch_name), patch["image"])
+
+                new_smp = fo.Sample(
+                    filepath=patch_name, tags=smp.tags if keep_sample_tags else []
+                )
+                new_smp[label_field] = fo.Detections(
+                    detections=[from_albumentations_box(box) for box in patch["bboxes"]]
+                )
+                new_samples.append(new_smp)
+
+    new_dataset.add_samples(new_samples)
+    return new_dataset

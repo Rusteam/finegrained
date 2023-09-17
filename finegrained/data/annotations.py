@@ -75,7 +75,8 @@ def annotate(
     if classes:
         classes = _parse_classes(classes)
     if task_name is None:
-        task_name = dataset.name + " - " + annotation_key
+        dataset_name = getattr(dataset, "dataset_name", dataset.name)
+        task_name = dataset_name + " - " + annotation_key
     dataset.annotate(
         annotation_key,
         label_field=label_field,

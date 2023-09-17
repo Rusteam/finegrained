@@ -15,3 +15,13 @@ def temp_dataset():
     yield dataset
     if fo.dataset_exists(dataset.name):
         fo.delete_dataset(dataset.name)
+
+
+@pytest.fixture(scope="function")
+def new_dataset_name_temp():
+    name = "fg-unittest-temp"
+    if fo.dataset_exists(name):
+        fo.delete_dataset(name)
+    yield name
+    if fo.dataset_exists(name):
+        fo.delete_dataset(name)

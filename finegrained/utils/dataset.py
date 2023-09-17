@@ -158,3 +158,15 @@ def get_all_filepaths(dataset: fo.Dataset) -> types.LIST_STR:
     """
     files = [smp.filepath for smp in dataset.select_fields("filepath")]
     return files
+
+
+def to_albumentations_box(detection: fo.Detection) -> list[float]:
+    xmin, ymin, width, height = detection.bounding_box
+    return [xmin, ymin, xmin + width, ymin + height, detection.label]
+
+
+def from_albumentations_box(box: list[float]) -> fo.Detection:
+    xmin, ymin, xmax, ymax, label = box
+    return fo.Detection(
+        label=label, bounding_box=[xmin, ymin, xmax - xmin, ymax - ymin]
+    )

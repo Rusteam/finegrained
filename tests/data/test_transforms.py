@@ -302,3 +302,23 @@ def test_tags_to_labels(temp_dataset):
     )
     assert counts["one"] > 0
     assert counts["two"] > 0
+
+
+def test_divide_images(temp_dataset, tmp_path, new_dataset_name_temp):
+    new = transforms.divide_images(
+        temp_dataset.name,
+        label_field="ground_truth",
+        target_size=320,
+        to_dataset_name=new_dataset_name_temp,
+        dest_dir=str(tmp_path / "divided"),
+        bbox_params=dict(min_visibility=0.25),
+        overwrite=False,
+        fields_exist="ground_truth",
+        skip_empty=True,
+        keep_sample_tags=True,
+        max_samples=5,
+    )
+    assert len(new) > 0
+    assert new.has_sample_field("ground_truth")
+    assert new.count_values("ground_truth.detections.label")
+    assert new.count_sample_tags()
