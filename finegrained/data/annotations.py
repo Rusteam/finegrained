@@ -34,8 +34,8 @@ def _parse_classes(src: Any) -> list[str]:
 def annotate(
     dataset: str,
     annotation_key: str,
-    label_field: str,
     backend: Any,
+    label_field: Optional[str] = None,
     overwrite: bool = False,
     label_type: Optional[str] = None,
     project_id: Optional[int] = None,
@@ -68,7 +68,7 @@ def annotate(
     backend_conf = _load_backend_config(backend)
     if dataset.has_annotation_run(annotation_key) and overwrite:
         dataset.delete_annotation_run(annotation_key)
-    if not dataset.has_sample_field(label_field) and label_type is None:
+    if label_field and not dataset.has_sample_field(label_field) and label_type is None:
         raise ValueError(
             f"{label_field=} does not exist in {dataset.name}. Specify 'label_type'"
         )
