@@ -204,7 +204,6 @@ def test_from_label_tag(temp_dataset):
         det = smp[label_field].detections[0]
         det.tags.append(label_tag)
         smp.save()
-    # to_tag.tag_labels(label_tag)
 
     label_values = transforms.from_label_tag(
         dataset=temp_dataset.name, label_field=label_field, label_tag=label_tag
@@ -304,11 +303,13 @@ def test_tags_to_labels(temp_dataset):
     assert counts["two"] > 0
 
 
-def test_divide_images(temp_dataset, tmp_path, new_dataset_name_temp):
+@pytest.mark.parametrize("stride", [0.5, 1.0])
+def test_divide_images(temp_dataset, tmp_path, new_dataset_name_temp, stride):
     new = transforms.divide_images(
         temp_dataset.name,
         label_field="ground_truth",
         target_size=320,
+        stride=stride,
         to_dataset_name=new_dataset_name_temp,
         dest_dir=str(tmp_path / "divided"),
         bbox_params=dict(min_visibility=0.25),
@@ -318,7 +319,7 @@ def test_divide_images(temp_dataset, tmp_path, new_dataset_name_temp):
         keep_sample_tags=True,
         max_samples=5,
     )
-    assert len(new) > 0
+    assert len(new) > 5 / stride
     assert new.has_sample_field("ground_truth")
     assert new.count_values("ground_truth.detections.label")
     assert new.count_sample_tags()

@@ -14,18 +14,22 @@ from finegrained.utils.dataset import load_fiftyone_dataset
 from finegrained.utils.general import parse_list_str
 
 
-def tag_samples(dataset: str, tags: types.LIST_STR_STR, **kwargs) -> dict:
+def tag_samples(
+    dataset: str, tags: types.LIST_STR_STR, overwrite: bool = False, **kwargs
+) -> dict:
     """Tag each sample in dataset with given tags
 
     Args:
         dataset: fiftyone dataset name
         tags: tags to apply
+        overwrite: delete existing tags if exist
         kwargs: dataset loading kwargs, i.e. filters
 
     Returns:
         a dict of sample tag counts
     """
     dataset = load_fiftyone_dataset(dataset, **kwargs)
+    _check_existing_tags(dataset, parse_list_str(tags), overwrite)
     dataset.tag_samples(parse_list_str(tags))
     return dataset.count_sample_tags()
 
@@ -33,6 +37,7 @@ def tag_samples(dataset: str, tags: types.LIST_STR_STR, **kwargs) -> dict:
 def split_dataset(
     dataset: str,
     splits: types.DICT_STR_FLOAT = {"train": 0.8, "val": 0.1, "test": 0.1},
+    overwrite: bool = False,
     **kwargs,
 ):
     """Create data split tags for a dataset
@@ -40,12 +45,14 @@ def split_dataset(
     Args:
         dataset: fiftyone dataset
         splits: a dict of split names and relative sizes
+        overwrite: if tags exist, overwrite them
         kwargs: dataset loading filters
 
     Returns:
         a dict of split counts
     """
     dataset = load_fiftyone_dataset(dataset, **kwargs)
+    _check_existing_tags(dataset, list(splits.keys()), overwrite)
     four.random_split(dataset, splits)
     return dataset.count_sample_tags()
 

@@ -160,8 +160,18 @@ def get_all_filepaths(dataset: fo.Dataset) -> types.LIST_STR:
     return files
 
 
-def to_albumentations_box(detection: fo.Detection) -> list[float]:
+def to_albumentations_box(detection: fo.Detection) -> list[float | str]:
+    """Convert fiftyone detection to albumentations format.
+
+    Args:
+        detection: fiftyone detection label
+
+    Returns:
+        albumentation box with a label
+    """
     xmin, ymin, width, height = detection.bounding_box
+    xmin = max(0, xmin)
+    ymin = max(0, ymin)
     return [xmin, ymin, xmin + width, ymin + height, detection.label]
 
 

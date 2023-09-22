@@ -1,5 +1,6 @@
 """Dataset converting and exporting utils.
 """
+import shutil
 from pathlib import Path
 from typing import List, Optional
 
@@ -10,6 +11,7 @@ from finegrained.utils.dataset import (
     get_unique_labels,
     load_fiftyone_dataset,
 )
+from finegrained.utils.general import parse_list_str
 
 
 def to_yolov5(
@@ -17,6 +19,7 @@ def to_yolov5(
     label_field: str,
     export_dir: str,
     splits: List[str],
+    overwrite: bool = False,
     **kwargs,
 ):
     """Export a dataset into yolov5 format for training
@@ -26,10 +29,15 @@ def to_yolov5(
         label_field: field that contains labels
         export_dir: where to write data
         splits: which splits to export
+        overwrite: whether to overwrite existing destination directory
         **kwargs: dataset loading filters
     """
     dataset = load_fiftyone_dataset(dataset, **kwargs)
+    splits = parse_list_str(splits)
     labels = get_unique_labels(dataset, label_field)
+    if Path(export_dir).exists() and overwrite:
+        shutil.rmtree(export_dir)
+        print(f"Removed existing {export_dir}")
     for tag in splits:
         subset = dataset.match_tags(tag)
         assert len(subset) > 0, f"No samples in the subset with {tag=}"
@@ -94,6 +102,7 @@ def to_clf_dir(
     export_dir: str,
     tags: list[str],
     label_field: str = "ground_truth",
+    overwrite: bool = False,
     **kwargs,
 ) -> None:
     """Export a dataset into classification directory structure
@@ -107,6 +116,9 @@ def to_clf_dir(
         **kwargs: dataset loading filters
     """
     export_dir = Path(export_dir)
+    if export_dir.exists() and overwrite:
+        shutil.rmtree(export_dir)
+        print(f"Removed existing {export_dir=!r}")
     export_dir.mkdir(parents=True, exist_ok=True)
 
     dataset = load_fiftyone_dataset(dataset, include_tags=tags, **kwargs)

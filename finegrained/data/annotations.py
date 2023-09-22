@@ -3,9 +3,12 @@
 from pathlib import Path
 from typing import Any, Optional
 
-from ..utils import types
-from ..utils.dataset import load_fiftyone_dataset
-from ..utils.os_utils import read_file_config, read_txt
+import fiftyone as fo
+import fiftyone.utils.cvat as fouc
+
+from finegrained.utils import types
+from finegrained.utils.dataset import load_fiftyone_dataset
+from finegrained.utils.os_utils import read_file_config, read_txt
 
 
 def _load_backend_config(src: Any) -> dict:
@@ -156,3 +159,40 @@ def print_status(dataset: str, key: str, backend: str) -> None:
 
     results = dataset.load_annotation_results(key, **backend_conf)
     results.print_status()
+
+
+def _from_cvat_box(box: fouc.CVATImageBox, img_w: int, img_h: int) -> fo.Detection:
+    """Convert CVAT box to fiftyone detection"""
+    xmin, ymin, xmax, ymax = box.xtl, box.ytl, box.xbr, box.ybr
+    return fo.Detection(
+        label=box.label,
+        bounding_box=[
+            xmin / img_w,
+            ymin / img_h,
+            (xmax - xmin) / img_w,
+            (ymax - ymin) / img_h,
+        ],
+    )
+
+
+def from_cvat_annotations_file(
+    dataset: str, annotations_file: str, label_field: str = "ground_truth"
+) -> dict[str, int]:
+    """Load annotations from CVAT annotations file export.
+
+    Args:
+        dataset: fiftyone dataset name
+        annotations_file: path to CVAT annotations file
+        label_field: which field to store annotations
+    """
+    info, task_labels, images = fouc.load_cvat_image_annotations(annotations_file)
+    dataset = fo.load_dataset(dataset)
+    for img in images:
+        fname = img.name.split("_", 1)[1]
+        sample = dataset.match(fo.ViewField("filepath").ends_with(fname)).first()
+        sample[label_field] = fo.Detections(
+            detections=[_from_cvat_box(box, img.width, img.height) for box in img.boxes]
+        )
+        sample.save()
+
+    return dataset.count_values(f"{label_field}.detections.label")

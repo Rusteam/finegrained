@@ -260,12 +260,14 @@ def map_labels(
     dataset = load_fiftyone_dataset(dataset, **kwargs)
 
     if overwrite and dataset.has_sample_field(to_field):
-        delete_field(dataset.dataset_name, to_field)
+        delete_field(getattr(dataset, "dataset_name", dataset.name), to_field)
     elif not overwrite and dataset.has_sample_field(to_field):
         raise ValueError(f"{to_field=} already exists")
 
     dataset.clone_sample_field(from_field, to_field)
     if bool(label_mapping):
+        if isinstance(label_mapping, str) and label_mapping.endswith(("yml", "yaml")):
+            label_mapping = read_yaml(label_mapping)
         dataset = dataset.map_labels(to_field, label_mapping)
         dataset.save(to_field)
     return dataset
@@ -322,14 +324,29 @@ def from_label_tag(dataset: str, label_field: str, label_tag: str, **kwargs) -> 
     """
     kwargs = kwargs | {"label_tags": label_tag}
     dataset = load_fiftyone_dataset(dataset, **kwargs)
+    label_path = None
 
     for smp in tqdm(dataset.select_fields(label_field), desc="updating samples"):
-        for det in smp[label_field].detections:
-            if label_tag in det.tags:
-                det.label = label_tag
-                smp.save()
+        label_type = dataset.get_field(label_field).document_type
+        if label_type == fo.Classification:
+            if smp[label_field]:
+                smp[label_field].label = label_tag
+            else:
+                smp[label_field] = fo.Classification(label=label_tag)
+            label_path = f"{label_field}.label"
+        elif label_type == fo.Detections:
+            for det in smp[label_field].detections:
+                if label_tag in det.tags:
+                    det.label = label_tag
+            label_path = f"{label_field}.detections.label"
+        else:
+            raise NotImplementedError(
+                f"{label_field=} is of type {label_type!r} not implemented"
+            )
 
-    return dataset.count_values(f"{label_field}.detections.label")
+        smp.save()
+
+    return dataset.count_values(label_path)
 
 
 def combine_datasets(
@@ -494,12 +511,14 @@ def divide_images(
     dataset: str,
     label_field: str,
     target_size: int,
+    stride: float = 1.0,
     to_dataset_name: str = "auto",
     dest_dir: str = "auto",
     bbox_params: dict = {},
     skip_empty: bool = True,
     keep_sample_tags: bool = False,
     overwrite: bool = False,
+    overwrite_dest: bool = False,
     **kwargs,
 ) -> fo.Dataset:
     """Divide images into patches of target_size and create new dataset.
@@ -512,6 +531,8 @@ def divide_images(
                     (only detections supported at the moment)
         target_size: target image size, some patches will be smaller
                     if image size is not divisible by target_size
+        stride: if < 1, then patches will overlap. If > 1, then patches
+                will have gaps.
         to_dataset_name: a new dataset name
         dest_dir: a directory where cropped patches will be saved
         skip_empty: whether to skip patches without labels
@@ -520,6 +541,7 @@ def divide_images(
         bbox_params: albumentations parameters for keeping bounding boxes
                     such as min_visibility [0.0, 1.0] and min_area [0, target_size]
         overwrite: whether to overwrite existing new dataset
+        overwrite_dest: whether to delete existing dest_dir
         **kwargs: dataset loading filters
     """
     import albumentations as A
@@ -538,6 +560,9 @@ def divide_images(
         if dest_dir != "auto"
         else Path(f"./finegrained/images/{dataset.name}-divided-{target_size}")
     )
+    if dest_dir.exists() and overwrite_dest:
+        shutil.rmtree(dest_dir)
+        print(f"{dest_dir=} deleted")
     dest_dir.mkdir(parents=True, exist_ok=True)
 
     if to_dataset_name == "auto":
@@ -545,17 +570,19 @@ def divide_images(
         to_dataset_name = f"{dataset_name}-divided-{target_size}"
     if fo.dataset_exists(to_dataset_name) and overwrite:
         fo.delete_dataset(to_dataset_name, verbose=True)
-    elif fo.dataset_exists(to_dataset_name):
-        raise ValueError(f"{to_dataset_name=} already exists")
 
-    new_dataset = fo.Dataset(name=to_dataset_name, persistent=True)
+    if fo.dataset_exists(to_dataset_name):
+        target_dataset = fo.load_dataset(to_dataset_name)
+        print(f"Dataset {target_dataset!r} already exists, adding samples to it")
+    else:
+        target_dataset = fo.Dataset(name=to_dataset_name, persistent=True)
     new_samples = []
     for smp in tqdm(dataset.select_fields([label_field]), "dividing images"):
         img = cv2.imread(smp.filepath)
         height, width = img.shape[:2]
 
-        for i in range(0, height, target_size):
-            for j in range(0, width, target_size):
+        for i in range(0, height, int(target_size * stride)):
+            for j in range(0, width, int(target_size * stride)):
                 transform = A.Compose(
                     [
                         A.Crop(
@@ -592,5 +619,5 @@ def divide_images(
                 )
                 new_samples.append(new_smp)
 
-    new_dataset.add_samples(new_samples)
-    return new_dataset
+    target_dataset.add_samples(new_samples)
+    return target_dataset
