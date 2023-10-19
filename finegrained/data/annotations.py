@@ -48,6 +48,9 @@ def annotate(
     task_asignee: Optional[str] = None,
     organization: Optional[str] = None,
     classes: Optional[str] = None,
+    frame_start: Optional[int] = None,
+    frame_stop: Optional[int] = None,
+    frame_step: Optional[int] = None,
     **kwargs,
 ):
     """Send samples to annotations
@@ -65,6 +68,10 @@ def annotate(
         segment_size: number of frames/images per one job
         project_id: which cvat project to connect to
         task_asignee: assignee for the task
+        organization: cvat organization name
+        frame_start: start frame index for all videos
+        frame_stop: stop frame index for all videos
+        frame_step: step frame index for all videos
         **kwargs: dataset loading filters
     """
     dataset = load_fiftyone_dataset(dataset, **kwargs)
@@ -91,6 +98,9 @@ def annotate(
         classes=classes,
         task_asignee=task_asignee,
         organization=organization,
+        frame_start=frame_start,
+        frame_stop=frame_stop,
+        frame_step=frame_step,
         **backend_conf,
     )
 

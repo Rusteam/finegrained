@@ -172,7 +172,9 @@ def to_albumentations_box(detection: fo.Detection) -> list[float | str]:
     xmin, ymin, width, height = detection.bounding_box
     xmin = max(0, xmin)
     ymin = max(0, ymin)
-    return [xmin, ymin, xmin + width, ymin + height, detection.label]
+    xmax = min(1.0, xmin + width)
+    ymax = min(1.0, ymin + height)
+    return [xmin, ymin, xmax, ymax, detection.label]
 
 
 def from_albumentations_box(box: list[float]) -> fo.Detection:
