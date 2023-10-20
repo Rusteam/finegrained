@@ -17,6 +17,18 @@ def temp_dataset():
         fo.delete_dataset(dataset.name)
 
 
+@pytest.fixture(scope="module")
+def temp_dataset_video():
+    dataset = (
+        foz.load_zoo_dataset("quickstart-video", max_samples=5)
+        .take(5)
+        .clone("test_transforms_video_temp")
+    )
+    yield dataset
+    if fo.dataset_exists(dataset.name):
+        fo.delete_dataset(dataset.name)
+
+
 @pytest.fixture(scope="function")
 def new_dataset_name_temp():
     name = "fg-unittest-temp"

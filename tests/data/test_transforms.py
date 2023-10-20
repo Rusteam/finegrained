@@ -60,10 +60,19 @@ def test_delete_field(temp_dataset):
     temp_dataset.clone_sample_field("ground_truth", "new")
     temp_dataset.clone_sample_field("new", "new_clone")
     temp_dataset.clone_sample_field("new", "last_clone")
+    temp_dataset.clone_sample_field("new", "delete_pattern")
+    temp_dataset.clone_sample_field("new", "delete_second_pattern")
 
     transforms.delete_field(temp_dataset.name, "last_clone")
     transforms.delete_field(temp_dataset.name, ["new", "new_clone"])
-    for field in ["new", "new_clone", "last_clone"]:
+    transforms.delete_field(temp_dataset.name, "delete_*")
+    for field in [
+        "new",
+        "new_clone",
+        "last_clone",
+        "delete_pattern",
+        "delete_second_pattern",
+    ]:
         assert not temp_dataset.has_sample_field(field)
 
 
@@ -323,3 +332,24 @@ def test_divide_images(temp_dataset, tmp_path, new_dataset_name_temp, stride):
     assert new.has_sample_field("ground_truth")
     assert new.count_values("ground_truth.detections.label")
     assert new.count_sample_tags()
+
+
+@pytest.mark.parametrize(
+    "label_field,frame_end,frame_step",
+    [
+        ("detections", 100, None),
+        ("frames.detections", None, 100),
+    ],
+)
+def test_frames_to_images(
+    temp_dataset_video, label_field, frame_end, frame_step, tmp_path
+):
+    new_label_counts = transforms.frames_to_images(
+        temp_dataset_video.name,
+        label_field=label_field,
+        frame_end=frame_end,
+        frame_step=frame_step,
+        overwrite=True,
+        export_dir=str(tmp_path / "frames_to_images"),
+    )
+    assert new_label_counts

@@ -1,5 +1,6 @@
 """Data transforms on top of fiftyone datasets.
 """
+import fnmatch
 import shutil
 from pathlib import Path
 from typing import Optional
@@ -128,20 +129,36 @@ def to_patches(
 
 
 def delete_field(dataset: str, fields: types.LIST_STR_STR):
-    """Delete one or more fields from a dataset
+    """Delete one or more fields from a dataset.
 
     Args:
-        dataset: fiftyone dataset name
-        fields: fields to delete
+        dataset: fiftyone dataset name (image or video)
+        fields: fields to delete. It can be a str, list of str or a wildcard.
 
     Returns:
         a fiftyone dataset
     """
     dataset = load_fiftyone_dataset(dataset)
-    fields = parse_list_str(fields)
-    for field in fields:
-        dataset.delete_sample_field(field)
-        print(f"{field=} deleted from {dataset.name=}")
+    if isinstance(fields, str) and "*" in fields:
+        if fields == "*":
+            key = input("Deleting all label fields. Press Y/N to continue...")
+            if key.lower() != "y":
+                return dataset
+            else:
+                print("Deleting all label fields")
+        existing_labels = dataset._get_label_fields()
+        if dataset.media_type == "video":
+            fields = fields.lstrip("frames.")
+            existing_labels = [f.lstrip("frames.") for f in existing_labels]
+        fields = fnmatch.filter(existing_labels, fields)
+    else:
+        fields = parse_list_str(fields)
+
+    if dataset.media_type == "video":
+        dataset.delete_frame_fields(fields)
+    else:
+        dataset.delete_sample_fields(fields)
+    print(f"{fields=} deleted from {dataset.name=}")
     return dataset
 
 
@@ -621,3 +638,84 @@ def divide_images(
 
     target_dataset.add_samples(new_samples)
     return target_dataset
+
+
+def frames_to_images(
+    dataset: str,
+    label_field: str,
+    frame_start: int = 1,
+    frame_end: Optional[int] = None,
+    frame_step: Optional[int] = None,
+    dest_name: Optional[str] = None,
+    export_dir: Optional[str] = None,
+    overwrite: bool = False,
+    **kwargs,
+):
+    """Convert video frames with labels to a labelled image dataset.
+
+    # TODO skip empty frames
+    """
+    dest_name = dest_name or f"{dataset}-frames"
+    if fo.dataset_exists(dest_name) and not overwrite:
+        raise ValueError(f"{dest_name=} already exists")
+    elif fo.dataset_exists(dest_name) and overwrite:
+        filepaths = fo.load_dataset(dest_name).values("filepath")
+        _ = [Path(f).unlink(missing_ok=True) for f in filepaths]
+        fo.delete_dataset(dest_name, verbose=True)
+    export_dir = Path(export_dir or f"./finegrained/{dataset}/frames")
+
+    dataset = load_fiftyone_dataset(dataset, **kwargs)
+    if dataset.media_type != "video":
+        raise ValueError(f"{dataset.name=} is not a video dataset")
+    else:
+        label_field = label_field.lstrip("frames.")
+
+    if not dataset.has_frame_field(label_field):
+        raise ValueError(f"{dataset.name=!r} does not have {label_field=!r}")
+
+    dataset = dataset.match_frames(fo.ViewField(label_field).exists())
+    dataset.compute_metadata()
+    new = fo.Dataset(name=dest_name, persistent=True)
+    export_dir.mkdir(parents=True, exist_ok=True)
+
+    for smp in dataset.select_fields(f"frames.{label_field}"):
+        frame_end = int(
+            min(
+                [
+                    frame_end or smp.metadata["total_frame_count"],
+                    smp.metadata["total_frame_count"],
+                ]
+            )
+        )
+        frame_step = int(frame_step or round(smp.metadata["frame_rate"]))
+        video = cv2.VideoCapture(smp.filepath)
+        if not video.isOpened():
+            print(f"Unable to open {smp.filepath!r}")
+            continue
+
+        for i in tqdm(
+            range(frame_start, frame_end, frame_step),
+            desc=f"Iterating frames of {smp.filepath}",
+            total=(frame_end - frame_start) // frame_step,
+        ):
+            # extract a frame and save it
+            video.set(cv2.CAP_PROP_POS_FRAMES, i)
+            ret, frame = video.read()
+            if ret:
+                write_path = export_dir / f"{smp.id}-{i}.jpg"
+                cv2.imwrite(str(write_path), frame)
+            else:
+                print(f"Unable to read frame={i} from {smp.filepath!r}")
+                continue
+            frame = smp.frames[i]
+            new_smp = fo.Sample(
+                filepath=str(write_path),
+                tags=smp.tags,
+            )
+            new_smp[label_field] = frame[label_field]
+            new_smp["original_frame"] = f"{dataset.name}-{smp.id}-{i}"
+            new.add_sample(new_smp)
+
+        video.release()
+
+    return new.count_values(f"{label_field}.detections.label")
