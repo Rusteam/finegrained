@@ -679,14 +679,8 @@ def frames_to_images(
     export_dir.mkdir(parents=True, exist_ok=True)
 
     for smp in dataset.select_fields(f"frames.{label_field}"):
-        frame_end = int(
-            min(
-                [
-                    frame_end or smp.metadata["total_frame_count"],
-                    smp.metadata["total_frame_count"],
-                ]
-            )
-        )
+        frame_end = int(min([frame_end or len(smp.frames), len(smp.frames)]))
+        frame_start = int(max([min(smp.frames), frame_start]))
         frame_step = int(frame_step or round(smp.metadata["frame_rate"]))
         video = cv2.VideoCapture(smp.filepath)
         if not video.isOpened():
