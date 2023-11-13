@@ -189,7 +189,7 @@ def _check_existing_tags(dataset, tags, overwrite):
     Raises:
         ValueError: if tags already exist and overwrite is False
     """
-    existing_tags = dataset.tags
+    existing_tags = list(dataset.count_sample_tags().keys())
     is_overlap = any([t in existing_tags for t in tags])
     if len(existing_tags) > 0 and is_overlap:
         if overwrite:
